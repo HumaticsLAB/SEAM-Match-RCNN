@@ -6,10 +6,9 @@ import torch.distributed as dist
 import argparse
 from datasets.MFDataset import MovingFashionDataset, get_dataloader
 import numpy as np
-from sklearn.cluster import AffinityPropagation
 from tqdm import tqdm
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "3"
+
 
 
 def evaluate(model, data_loader, device, strategy="best_match"
@@ -454,6 +453,7 @@ if __name__ == '__main__':
 
     args.batch_size = (1 +  args.frames_per_shop_test) * 1
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
     gpu_map = [0, 1, 2, 3]
 
     if 'WORLD_SIZE' in os.environ:
