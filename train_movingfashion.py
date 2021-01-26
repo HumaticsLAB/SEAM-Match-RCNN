@@ -114,7 +114,7 @@ def train(args):
             os.makedirs(args.save_path, exist_ok=True)
             torch.save({
                     'epoch': epoch,
-                    'model_state_dict': model.state_dict().detach().cpu(),
+                    'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'scheduler_state_dict': lr_scheduler.state_dict()
                 }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % epoch))
