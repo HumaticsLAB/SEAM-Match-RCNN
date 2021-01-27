@@ -1,34 +1,14 @@
+from copy import deepcopy
+
 import torch
 import torch.nn.functional as F
 from torch.hub import load_state_dict_from_url
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.mask_rcnn import MaskRCNN
 from torchvision.models.detection.roi_heads import fastrcnn_loss, maskrcnn_loss, maskrcnn_inference
-from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.ops import MultiScaleRoIAlign
 from torchvision.ops import boxes as box_ops
 
-from .match_head import MatchPredictor, MatchLoss
-
-custom_params = {
-    'rpn_anchor_generator': AnchorGenerator((32, 64, 128, 256, 512), (0.5, 1.0, 2.0)),
-    'rpn_pre_nms_top_n_train': 2000,
-    'rpn_pre_nms_top_n_test': 1000,
-    'rpn_post_nms_top_n_test': 4000,
-    'rpn_post_nms_top_n_train': 8000,
-
-    'box_roi_pool': MultiScaleRoIAlign(
-        featmap_names=[0, 1, 2, 3],
-        output_size=7,
-        sampling_ratio=2),
-    'mask_roi_pool': MultiScaleRoIAlign(
-        featmap_names=[0, 1, 2, 3],
-        output_size=14,
-        sampling_ratio=2),
-    # 'image_mean': [0.60781138, 0.57332054, 0.55193729],
-    # 'image_std': [0.06657078, 0.06587644, 0.06175072]
-}
-
+from .match_head import MatchPredictor, MatchLoss, TemporalAggregationNLB as TemporalAggregation
 
 model_urls = {
     'maskrcnn_resnet50_fpn_coco':
@@ -36,10 +16,12 @@ model_urls = {
 }
 
 
-class NewRoIHeads(torch.nn.Module):
-    def __init__(self, orh):
+class TemporalRoIHeads(torch.nn.Module):
+
+    def __init__(self, orh, n_frames):
         # orh: old_roi_heads
-        super(NewRoIHeads, self).__init__()
+        super(TemporalRoIHeads, self).__init__()
+        self.n_frames = n_frames
 
         self.box_roi_pool = orh.box_roi_pool
         self.box_head = orh.box_head
@@ -54,6 +36,9 @@ class NewRoIHeads(torch.nn.Module):
 
         self.match_predictor = MatchPredictor()
         self.match_loss = MatchLoss()
+
+        self.tracking_predictor = deepcopy(self.match_predictor)
+        self.temporal_aggregator = TemporalAggregation()
 
         self.keypoint_roi_pool = orh.keypoint_head
         self.keypoint_head = orh.keypoint_head
@@ -254,16 +239,35 @@ class NewRoIHeads(torch.nn.Module):
             boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
             num_images = len(boxes)
             for i in range(num_images):
-                result.append(
-                    dict(
-                        boxes=boxes[i],
-                        labels=labels[i],
-                        scores=scores[i],
+                if boxes[i].numel() > 0:
+                    result.append(
+                        dict(
+                            boxes=boxes[i],
+                            labels=labels[i],
+                            scores=scores[i],
+                        )
                     )
-                )
+                else:
+                    result.append(
+                        dict(
+                            boxes=torch.tensor([0.0, 0.0, image_shapes[i][1], image_shapes[i][0]]).to(boxes[i].device).unsqueeze(0),
+                            labels=torch.tensor([0]).to(boxes[i].device),
+                            scores=torch.tensor([0.1]).to(boxes[i].device),
+                        )
+                    )
 
         if self.has_mask:
+            if targets is not None:
+                assert(len(targets) == len(result))
+                # result.extend([{k:v for k, v in x.items() if k in ["boxes", "labels"]} for x in targets])
+                for i, r in enumerate(result):
+                    r["boxes"] = torch.cat([targets[i]["boxes"], r["boxes"]])
+                    r["labels"] = torch.cat([targets[i]["labels"], r["labels"]])
+                    r["scores"] = torch.cat([torch.ones((targets[i]["labels"].numel(),)).to(r["scores"].device), r["scores"]])
+                    # if "scores" not in r:
+                    #     r["scores"] = torch.ones((r["labels"].numel(),))
             mask_proposals = [p["boxes"] for p in result]
+
             if self.training:
                 # during training, only focus on positive boxes
                 num_images = len(proposals)
@@ -296,34 +300,26 @@ class NewRoIHeads(torch.nn.Module):
 
         if self.has_match:
             if self.training:
-                gt_proposals = [t["boxes"] for t in targets]
-                match_proposals, mask_roi_features, matched_idxs_match = filter_proposals(mask_proposals,
-                                                                                          mask_roi_features,
-                                                                                          gt_proposals,
-                                                                                          pos_matched_idxs)
                 types = []
                 s_imgs = []
                 i = 0
-                for p, s in zip(match_proposals, targets):
+                for p, s in zip(mask_proposals, targets):
                     types = types + ([1] * len(p) if s['sources'][0] == 1 else [0] * len(p))
                     s_imgs = s_imgs + ([i] * len(p))
                     i += 1
                 types = torch.IntTensor(types)
-                # match_roi_features = self.mask_roi_pool(features, match_proposals, image_shapes)
                 final_features, match_logits = self.match_predictor(mask_roi_features, types)
 
                 gt_pairs = [t["pair_ids"] for t in targets]
                 gt_styles = [t["styles"] for t in targets]
 
-                loss_match = self.match_loss(match_logits, match_proposals, gt_proposals, gt_pairs, gt_styles, types,
-                                             pos_matched_idxs)
-
+                loss_match = self.match_loss(match_logits, mask_proposals, gt_pairs, gt_styles, types, pos_matched_idxs)
+                # print(loss_match)
                 loss_match = dict(loss_match=loss_match)
 
 
             else:
                 loss_match = {}
-
                 s_imgs = []
                 for i, p in enumerate(mask_proposals):
                     if i == 0:
@@ -333,11 +329,13 @@ class NewRoIHeads(torch.nn.Module):
                     s_imgs = s_imgs + ([i] * len(p))
 
                 types = torch.IntTensor(types)
-                final_features, match_logits = self.match_predictor(mask_roi_features, types)
-                for i, r in zip(range(len(mask_proposals)), result):
-                    r['match_features'] = final_features[torch.IntTensor(s_imgs) == i, ...]
-                    r['w'] = self.match_predictor.last.weight
-                    r['b'] = self.match_predictor.last.bias
+                if mask_roi_features.shape[0] > 0:
+                    final_features, match_logits = self.match_predictor(mask_roi_features, types)
+                    for i, r in zip(range(len(mask_proposals)), result):
+                        r['match_features'] = final_features[torch.IntTensor(s_imgs) == i, ...]
+                        r['w'] = self.match_predictor.last.weight
+                        r['b'] = self.match_predictor.last.bias
+                        r['roi_features'] = mask_roi_features[torch.IntTensor(s_imgs) == i]
 
             losses.update(loss_match)
 
@@ -345,20 +343,27 @@ class NewRoIHeads(torch.nn.Module):
 
 
 
-class MatchRCNN(MaskRCNN):
-    def __init__(self, backbone, num_classes, **kwargs):
-        super(MatchRCNN, self).__init__(backbone, num_classes, **kwargs)
-        self.roi_heads = NewRoIHeads(self.roi_heads)
+class VideoMatchRCNN(MaskRCNN):
+    def __init__(self, backbone, num_classes, n_frames, **kwargs):
+        super(VideoMatchRCNN, self).__init__(backbone, num_classes, **kwargs)
+        self.roi_heads = TemporalRoIHeads(self.roi_heads, n_frames)
+
+    def load_saved_matchrcnn(self, sd):
+        self.load_state_dict(sd, strict=False)
+        self.roi_heads.tracking_predictor\
+            .load_state_dict(deepcopy(self.roi_heads.match_predictor.state_dict()))
+        self.roi_heads.temporal_aggregator\
+            .load_state_dict(deepcopy(self.roi_heads.match_predictor.state_dict()), strict=False)
 
 
-
-def matchrcnn_resnet50_fpn(pretrained=False, progress=True,
-                           num_classes=91, pretrained_backbone=True, **kwargs):
+def videomatchrcnn_resnet50_fpn(pretrained=False, progress=True,
+                                num_classes=91, pretrained_backbone=True,
+                                n_frames=3, **kwargs):
     if pretrained:
         # no need to download the backbone if pretrained is set
         pretrained_backbone = False
     backbone = resnet_fpn_backbone('resnet50', pretrained_backbone)
-    model = MatchRCNN(backbone, num_classes, **kwargs)
+    model = VideoMatchRCNN(backbone, num_classes, n_frames, **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls['maskrcnn_resnet50_fpn_coco'],
                                               progress=progress)

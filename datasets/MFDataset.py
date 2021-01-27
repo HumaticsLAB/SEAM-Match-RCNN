@@ -1,14 +1,13 @@
+import json
 import os
-from copy import deepcopy
+import random
+
+import cv2
 import numpy as np
 import torch
-from torch.utils.data import Dataset
 from PIL import Image
-import cv2
+from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import Sampler
-import random
-import json
 
 
 class MovingFashionDataset(Dataset):
@@ -111,7 +110,7 @@ def get_dataloader(dataset, batch_size, is_parallel, n_products=1
         else:
             sampler = torch.utils.data.sampler.RandomSampler(dataset)
 
-    batch_sampler = NAPBatchSampler(dataset, sampler, batch_size, drop_last=True, n_products=n_products
+    batch_sampler = MFBatchSampler(dataset, sampler, batch_size, drop_last=True, n_products=n_products
                                     , first_n_withvideo=first_n_withvideo, uniform_sampling=uniform_sampling
                                     , fixed_frame=fixed_frame, fixed_ind=fixed_ind, fixed_video_i=fixed_video_i)
 
@@ -121,11 +120,11 @@ def get_dataloader(dataset, batch_size, is_parallel, n_products=1
     return data_loader
 
 
-class NAPBatchSampler(torch.utils.data.BatchSampler):
+class MFBatchSampler(torch.utils.data.BatchSampler):
     def __init__(self, dataset, sampler, batch_size, drop_last, n_samples=100
                  , n_products=1, first_n_withvideo=None, uniform_sampling=False, fixed_frame=None
                  , fixed_ind=None, fixed_video_i=None):
-        super(NAPBatchSampler, self).__init__(sampler, batch_size, drop_last)
+        super(MFBatchSampler, self).__init__(sampler, batch_size, drop_last)
         self.data = dataset
         self.n_video_samples = n_samples
         self.n_products = n_products

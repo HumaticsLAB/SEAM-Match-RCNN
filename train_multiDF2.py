@@ -6,20 +6,17 @@ import torch
 import torch.distributed as dist
 from torch.utils.tensorboard import SummaryWriter
 
-from datasets.MFDataset import MovingFashionDataset, get_dataloader
-from evaluate_movingfashion import evaluate
+from datasets.MultiDF2Dataset import MultiDeepFashion2Dataset, get_dataloader
+from evaluate_multiDF2 import evaluate
 from models.video_maskrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
-from stuffs.engine import train_one_epoch_movingfashion
+from stuffs.engine import train_one_epoch_multiDF2
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (16384, rlimit[1]))
 
-# DistributedDataParallel tutorial @ https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
-# run with python -m torch.distributed.launch --nproc_per_node #GPUs train.py
-
-
 gpu_map = [0, 1, 2, 3]
+
 
 def get_transform(train):
     transforms = []
@@ -27,6 +24,7 @@ def get_transform(train):
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
     return T.Compose(transforms)
+
 
 # how many frames to extract from the video of each product
 
@@ -52,29 +50,26 @@ def train(args):
         device = torch.device("cuda")
 
     # DATASET ----------------------------------------------------------------------------------------------------------
-    train_dataset = MovingFashionDataset(args.train_annots
-                                  , transform=get_transform(True), noise=args.noise
-                                  , root=args.root)
-    test_dataset = MovingFashionDataset(args.test_annots
-                                 , transform=T.ToTensor(), noise=args.noise
-                                 , root=args.root)
-
+    train_dataset = MultiDeepFashion2Dataset(root=args.root_train
+                                             , ann_file=args.train_annots,
+                                             transforms=get_transform(True), noise=True, filter_onestreet=True)
+    test_dataset = MultiDeepFashion2Dataset(root=args.root_test
+                                            , ann_file=args.test_annots,
+                                            transforms=get_transform(False), filter_onestreet=True)
     # ------------------------------------------------------------------------------------------------------------------
 
     # DATALOADER--------------------------------------------------------------------------------------------------------
 
-    data_loader = get_dataloader(train_dataset, batch_size=args.batch_size_train
-                                 , is_parallel=distributed, n_products=args.n_shops, num_workers=args.n_workers)
-    data_loader_test = get_dataloader(test_dataset, batch_size=args.batch_size_test, is_parallel=distributed, num_workers=args.n_workers)
+    data_loader_train = get_dataloader(train_dataset, batch_size=args.batch_size_train
+                                       , is_parallel=distributed, n_products=args.n_shops, n_workers=args.n_workers)
+    data_loader_test = get_dataloader(test_dataset, batch_size=args.batch_size_test, is_parallel=distributed,
+                                      n_products=1, n_workers=args.n_workers)
 
     # ------------------------------------------------------------------------------------------------------------------
 
     # MODEL ------------------------------------------------------------------------------------------------------------
-
     model = videomatchrcnn_resnet50_fpn(pretrained_backbone=True, num_classes=14
                                         , n_frames=3)
-
-
 
     savefile = torch.load(args.pretrained_path)
     sd = savefile['model_state_dict']
@@ -95,7 +90,6 @@ def train(args):
 
     # ------------------------------------------------------------------------------------------------------------------
 
-
     if rank == 0:
         writer = SummaryWriter(os.path.join(args.save_path, args.save_tag))
     else:
@@ -106,7 +100,7 @@ def train(args):
     for epoch in range(args.num_epochs):
         # train for one epoch, printing every 10 iterations
         print("Starting epoch %d for process %d" % (epoch, rank))
-        train_one_epoch_movingfashion(model, optimizer, data_loader, device, epoch
+        train_one_epoch_multiDF2(model, optimizer, data_loader_train, device, epoch
                                  , print_freq=args.print_freq, score_thresh=0.1, writer=writer, inferstep=15)
         # update the learning rate
         lr_scheduler.step()
@@ -115,11 +109,11 @@ def train(args):
         if rank == 0 and ((epoch % args.save_epochs) == 0):
             os.makedirs(args.save_path, exist_ok=True)
             torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': lr_scheduler.state_dict()
-                }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % epoch))
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': lr_scheduler.state_dict()
+            }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % epoch))
             model = model.to(device)
 
         if rank == 0 and ((epoch % args.eval_freq) == 0):
@@ -128,47 +122,48 @@ def train(args):
             writer.add_scalar("single_acc", res[0], global_step=epoch)
             writer.add_scalar("avg_acc", res[1], global_step=epoch)
             writer.add_scalar("aggr_acc", res[2], global_step=epoch)
-            best_single, best_avg, best_aggr = max(res[0], best_single), max(res[1], best_avg)\
-                                            , max(res[2], best_aggr)
+            best_single, best_avg, best_aggr = max(res[0], best_single), max(res[1], best_avg) \
+                , max(res[2], best_aggr)
             print("Best results:\n  - Best single: %01.2f"
                   "\n  - Best avg: %01.2f\n  - Best aggr: %01.2f\n" % (best_single, best_avg, best_aggr))
 
     os.makedirs(args.save_path, exist_ok=True)
     torch.save({
-                    'epoch': args.num_epochs,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'scheduler_state_dict': lr_scheduler.state_dict()
-            }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % args.num_epochs))
+        'epoch': args.num_epochs,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': lr_scheduler.state_dict()
+    }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % args.num_epochs))
     print("That's it!")
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description="SEAM Training")
     parser.add_argument("--local_rank", type=int, default=0)
-    parser.add_argument("--gpus", type=str, default="2,3")
+    parser.add_argument("--gpus", type=str, default="0,1")
     parser.add_argument("--n_workers", type=int, default=8)
 
     parser.add_argument("--frames_per_shop_train", type=int, default=10)
     parser.add_argument("--frames_per_shop_test", type=int, default=10)
     parser.add_argument("--n_shops", type=int, default=16)
-    parser.add_argument("--root", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion")
-    parser.add_argument("--train_annots", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion/train.json")
-    parser.add_argument("--test_annots", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion/test.json")
+    parser.add_argument("--root_train", type=str, default='/media/data/cjoppi/deepfashion2/train/image')
+    parser.add_argument("--root_test", type=str, default='/media/data/cjoppi/deepfashion2/validation/image')
+    parser.add_argument("--train_annots", type=str, default='/media/data/cjoppi/deepfashion2/train/annots.json')
+    parser.add_argument("--test_annots", type=str, default='/media/data/cjoppi/deepfashion2/validation/annots.json')
     parser.add_argument("--noise", type=bool, default=True)
 
     parser.add_argument("--num_epochs", type=int, default=31)
     parser.add_argument("--milestones", type=int, default=[15, 25])
     parser.add_argument("--learning_rate", type=float, default=0.02)
-    parser.add_argument("--pretrained_path", type=str, default="/media/data/mgodi/match_rcnn_clean/weights/df2matchrcnn")
+    parser.add_argument("--pretrained_path", type=str,
+                        default="/media/data/mgodi/match_rcnn_clean/weights/df2matchrcnn")
 
     parser.add_argument("--print_freq", type=int, default=20)
     parser.add_argument("--eval_freq", type=int, default=4)
     parser.add_argument("--save_epochs", type=int, default=2)
 
-    parser.add_argument('--save_path',type=str, default="/media/data/cjoppi/CVPR2021/SEAM/models")
-    parser.add_argument('--save_tag', type=str, default="NLB")
+    parser.add_argument('--save_path', type=str, default="/media/data/cjoppi/CVPR2021/SEAM/models_df2")
+    parser.add_argument('--save_tag', type=str, default="DF2")
 
     args = parser.parse_args()
 

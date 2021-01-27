@@ -1,11 +1,12 @@
-import math
 import random
 import sys
 
+import numpy as np
 import torch
-import torch.distributed as dist
 import torchvision
+from PIL import Image
 from torch._six import int_classes as _int_classes
+from torch.utils.data import RandomSampler, DistributedSampler
 from torch.utils.data.sampler import BatchSampler
 from torch.utils.data.sampler import Sampler
 
@@ -60,12 +61,14 @@ def has_valid_annotation(anno):
     return False
 
 
-class DeepFashion2Dataset(torchvision.datasets.coco.CocoDetection):
+class MultiDeepFashion2Dataset(torchvision.datasets.coco.CocoDetection):
     def __init__(
-            self, ann_file, root, transforms=None
+            self, ann_file, root, transforms=None, noise=False, filter_onestreet=False
     ):
-        super(DeepFashion2Dataset, self).__init__(root, ann_file)
+        super(MultiDeepFashion2Dataset, self).__init__(root, ann_file)
         self.ids = sorted(self.ids)
+
+        print(len(self.ids))
 
         self.categories = {cat['id']: cat['name'] for cat in self.coco.cats.values()}
 
@@ -111,23 +114,58 @@ class DeepFashion2Dataset(torchvision.datasets.coco.CocoDetection):
                     inds.append(i)
                     self.match_map_shop.update({hashable_key: inds})
 
-        print("Filtering images with no matches")
-        street_match_keys = self.match_map_street.keys()
-        shop_match_keys = self.match_map_shop.keys()
-        self.accepted_entries = []
-        for x in self.match_map_street:
-            if x in shop_match_keys:
-                self.accepted_entries = self.accepted_entries + self.match_map_street.get(x)
+        if filter_onestreet:
+            print("Filtering products with one street or less")
 
-        for x in self.match_map_shop:
-            if x in street_match_keys:
-                self.accepted_entries = self.accepted_entries + self.match_map_shop.get(x)
+            to_del = []
+            self.shop_match_keys = self.match_map_shop.keys()
+            for x in self.match_map_street:
+                if x not in self.shop_match_keys or len(self.match_map_street[x]) < 2:
+                    to_del.append(x)
+            for x in to_del:
+                del self.match_map_street[x]
 
-        self.accepted_entries = list(set(self.accepted_entries))
-        print("Total images after filtering:" + str(len(self.accepted_entries)))
+            to_del = []
+            self.street_match_keys = list(self.match_map_street.keys())
+            for x in self.match_map_shop:
+                if x not in self.street_match_keys:
+                    to_del.append(x)
+            for x in to_del:
+                del self.match_map_shop[x]
 
-    def __getitem__(self, idx):
-        img, anno = super(DeepFashion2Dataset, self).__getitem__(idx)
+        self.noise = noise
+
+
+    def __len__(self):
+        return len(self.match_map_street)
+
+
+    def __getitem__(self, x):
+        # i: product id
+        # tag: "shop" or "street"
+        # index: None if tag is "shop" else index of street
+        i, tag, index = x
+        if tag == "shop":
+            idx = random.choice(self.match_map_shop[i])
+        else:
+            index2 = int(len(self.match_map_street[i]) * index)
+            idx = self.match_map_street[i][index2]
+
+        img, anno = super(MultiDeepFashion2Dataset, self).__getitem__(self.idx_to_id_map[idx])
+
+        # ****************************************************
+        image = np.array(img)
+        if self.noise:
+            tmp_noise = 0.1 if random.random() > 0.75 else 0.0
+        else:
+            tmp_noise = 0.0
+        image = image / 255.0
+        image += np.random.randn(*image.shape) * tmp_noise
+        image = image * 255.0
+        image = np.clip(image, 0, 255.0)
+        image = np.asarray(image, dtype=np.uint8)
+        img = Image.fromarray(image)
+        # ****************************************************
 
         anno = [obj for obj in anno if obj["iscrowd"] == 0]
 
@@ -174,6 +212,10 @@ class DeepFashion2Dataset(torchvision.datasets.coco.CocoDetection):
         if self._transforms is not None:
             img, target = self._transforms(img, target)
 
+
+        target["i"] = i
+        target['tag'] = 1 if tag == "shop" else 0
+
         return img, target, anno[0]['image_id']
 
     def get_img_info(self, index):
@@ -190,134 +232,20 @@ class DeepFashion2Dataset(torchvision.datasets.coco.CocoDetection):
 
         return inds
 
-
-def get_dataloader(dataset, batch_size, is_parallel, num_workers=0):
+def get_dataloader(dataset, batch_size, is_parallel, n_products=0, n_workers=0):
     if is_parallel:
         sampler = DistributedSampler(dataset, shuffle=True)
     else:
         sampler = RandomSampler(dataset)
 
-    batch_sampler = DF2MatchingSampler(dataset, sampler, batch_size, drop_last=True)
+    batch_sampler = MultiDF2BatchSampler(dataset, sampler, batch_size, drop_last=True, n_products=n_products)
 
-    data_loader = torch.utils.data.DataLoader(dataset, num_workers=num_workers, batch_sampler=batch_sampler,
+    data_loader = torch.utils.data.DataLoader(dataset, num_workers=n_workers, batch_sampler=batch_sampler,
                                               collate_fn=utils.collate_fn)
     return data_loader
 
 
-
-class RandomSampler(Sampler):
-    r"""Samples elements randomly. If without replacement, then sample from a shuffled dataset.
-    If with replacement, then user can specify :attr:`num_samples` to draw.
-
-    Arguments:
-        data_source (Dataset): dataset to sample from
-        replacement (bool): samples are drawn with replacement if ``True``, default=``False``
-        num_samples (int): number of samples to draw, default=`len(dataset)`. This argument
-            is supposed to be specified only when `replacement` is ``True``.
-    """
-
-    def __init__(self, data_source, replacement=False, num_samples=None):
-        self.data_source = data_source
-
-        self.replacement = replacement
-        self._num_samples = num_samples
-
-        pair_keys = [k for k in self.data_source.match_map_street.keys() if k in self.data_source.match_map_shop]
-        pair_keys += [k for k in self.data_source.match_map_shop.keys() if k in self.data_source.match_map_street]
-        self.pair_keys = list(set(pair_keys))
-
-
-        if not isinstance(self.replacement, bool):
-            raise ValueError("replacement should be a boolean value, but got "
-                             "replacement={}".format(self.replacement))
-
-        if self._num_samples is not None and not replacement:
-            raise ValueError("With replacement=False, num_samples should not be specified, "
-                             "since a random permute will be performed.")
-
-        if not isinstance(self.num_samples, int) or self.num_samples <= 0:
-            raise ValueError("num_samples should be a positive integer "
-                             "value, but got num_samples={}".format(self.num_samples))
-
-    @property
-    def num_samples(self):
-        # dataset size might change at runtime
-        if self._num_samples is None:
-            return len(self.pair_keys)
-        return self._num_samples
-
-    def __iter__(self):
-        n = len(self)
-        if self.replacement:
-            return iter(torch.randint(high=n, size=(self.num_samples,), dtype=torch.int64).tolist())
-        return iter(torch.randperm(n).tolist())
-
-    def __len__(self):
-        return self.num_samples
-
-
-
-class DistributedSampler(Sampler):
-    """Sampler that restricts data loading to a subset of the dataset.
-    It is especially useful in conjunction with
-    :class:`torch.nn.parallel.DistributedDataParallel`. In such case, each
-    process can pass a DistributedSampler instance as a DataLoader sampler,
-    and load a subset of the original dataset that is exclusive to it.
-    .. note::
-        Dataset is assumed to be of constant size.
-    Arguments:
-        dataset: Dataset used for sampling.
-        num_replicas (optional): Number of processes participating in
-            distributed training.
-        rank (optional): Rank of the current process within num_replicas.
-    """
-
-    def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True):
-        if num_replicas is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            num_replicas = dist.get_world_size()
-        if rank is None:
-            if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
-            rank = dist.get_rank()
-        self.dataset = dataset.accepted_entries
-
-        self.num_replicas = num_replicas
-        self.rank = rank
-        self.epoch = 0
-        self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.num_replicas))
-        self.total_size = self.num_samples * self.num_replicas
-        self.shuffle = shuffle
-
-    def __iter__(self):
-        if self.shuffle:
-            # deterministically shuffle based on epoch
-            g = torch.Generator()
-            g.manual_seed(self.epoch)
-            indices = torch.randperm(len(self.dataset), generator=g).tolist()
-        else:
-            indices = torch.arange(len(self.dataset)).tolist()
-
-        # add extra samples to make it evenly divisible
-        indices += indices[: (self.total_size - len(indices))]
-        assert len(indices) == self.total_size
-
-        # subsample
-        offset = self.num_samples * self.rank
-        indices = indices[offset: offset + self.num_samples]
-        assert len(indices) == self.num_samples
-
-        return iter(indices)
-
-    def __len__(self):
-        return self.num_samples
-
-    def set_epoch(self, epoch):
-        self.epoch = epoch
-
-
-class DF2MatchingSampler(Sampler):
+class MultiDF2BatchSampler(Sampler):
     r"""Wraps another sampler to yield a mini-batch of indices.
 
     Args:
@@ -362,34 +290,59 @@ class DF2MatchingSampler(Sampler):
         pair_keys += [k for k in self.data.match_map_shop.keys() if k in self.data.match_map_street]
         self.pair_keys = list(set(pair_keys))
 
-
     def __iter__(self):
         batch = []
+        count = -1
+        pair_keys = self.pair_keys
         for idx in self.sampler:
-            ind = self.data.accepted_entries[idx]
-            if ind in self.customer_inds:
-                street_ind = ind
-                shop_inds = self._getSamePairInShop(street_ind)
-                if len(shop_inds) != 0:
-                    shop_ind = random.choice(shop_inds)
-                    batch.append(self.data.idx_to_id_map.get(street_ind))
-                    batch.append(self.data.idx_to_id_map.get(shop_ind))
-                    self.tmp_index.append(str(shop_ind) + '_' + str(street_ind))
-                else:
-                    print(idx)
+            batch.append((pair_keys[idx], "shop", None))
+            count += 1
+            tmp_video_samples = sorted([random.random() for x in range((self.batch_size // self.n_products) - 1)])
 
-            else:
-                shop_ind = ind
-                street_inds = self._getSamePairInStreet(shop_ind)
-                if len(street_inds) != 0:
-                    street_ind = random.choice(street_inds)
-                    batch.append(self.data.idx_to_id_map.get(street_ind))
-                    batch.append(self.data.idx_to_id_map.get(shop_ind))
-                    self.tmp_index.append(str(shop_ind) + '_' + str(street_ind))
-                else:
-                    print(idx)
-            if len(batch) == self.batch_size:
+            for t in tmp_video_samples:
+                batch.append((pair_keys[idx], "street", t))
+            if self.batch_size == 1 or len(batch) == self.batch_size:
                 yield batch
                 batch = []
-            if len(batch) > 0 and not self.drop_last:
-                yield batch
+        if not self.drop_last:
+            yield batch
+            batch = []
+
+    def __len__(self):
+        if self.drop_last:
+            return len(self.sampler) // self.n_products
+        else:
+            return 1 + (len(self.sampler) // self.n_products)
+
+    def _getTypeInds(self, type_s):
+        inds = []
+        N = len(self.data)
+        for i in range(1, N + 1):
+            if self.data.coco.imgs[i]['source'] == type_s:
+                inds.append(i)
+
+        return inds
+
+    def _getSamePairInShop(self, id):
+        match_desc = self.data.coco.imgs[id]['match_desc']
+        ids = []
+
+        for x in match_desc:
+            hashable_key = x + '_' + str(match_desc.get(x))
+            matches = self.match_map_shop.get(hashable_key)
+            if matches is not None:
+                ids = ids + matches
+
+        return ids
+
+    def _getSamePairInStreet(self, id):
+        match_desc = self.data.coco.imgs[id]['match_desc']
+        ids = []
+
+        for x in match_desc:
+            hashable_key = x + '_' + str(match_desc.get(x))
+            matches = self.match_map_street.get(hashable_key)
+            if matches is not None:
+                ids = ids + matches
+
+        return ids
