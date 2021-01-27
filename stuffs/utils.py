@@ -1,16 +1,15 @@
 from __future__ import print_function
 
-from collections import defaultdict, deque
 import datetime
+import errno
+import math
+import os
 import pickle
 import time
-import math
+from collections import defaultdict, deque
 
 import torch
 import torch.distributed as dist
-
-import errno
-import os
 
 
 def visualize_matches(logits, img_ids, types, ind0, ind1, images, boxes, scores, score_thresh=0.7):
