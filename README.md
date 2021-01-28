@@ -46,6 +46,15 @@ unset INSTALL_DIR
 ```
 ## Dataset and Pre-Trained models
 
+SEAM Match-RCNN has been trained and test on MovingFashion and DeepFashion2 datasets.
+Follow the instruction to download and extract the datasets.
+
+### MovingFashion
+
+
+### Deepfashion
+
+
 ## Training
 
 Qua va prima addestrato Match, poiSEAM
