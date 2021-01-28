@@ -55,7 +55,7 @@ Follow the instruction to download and extract the datasets.
 
 
 ### Deepfashion2
-DeepFashion2 dataset is available [here](https://drive.google.com/drive/folders/125F48fsMBz2EF0Cpqk6aaHet5VH399Ok?usp=sharing). You need [fill](https://docs.google.com/forms/d/e/1FAIpQLSeIoGaFfCQILrtIZPykkr8q_h9qQ5BoTYbjvf95aXbid0v2Bw/viewform?usp=sf_link) in the form to get password for unzipping files.
+DeepFashion2 dataset is available [here](https://drive.google.com/drive/folders/125F48fsMBz2EF0Cpqk6aaHet5VH399Ok?usp=sharing). You need fill in the [form](https://docs.google.com/forms/d/e/1FAIpQLSeIoGaFfCQILrtIZPykkr8q_h9qQ5BoTYbjvf95aXbid0v2Bw/viewform?usp=sf_link) to get password for unzipping files.
 
 
 Once the dataset will be extracted, use the reserved DeepFtoCoco.py script to convert the annotations in COCO format, specifying dataset path.
