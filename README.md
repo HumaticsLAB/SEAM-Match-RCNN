@@ -6,12 +6,13 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 
 ### Requirements:
 - Pytorch 1.5.1 or more recent, with cudatoolkit (10.2)
-- Torchvision
-- Tensorboard
-- cocoApi
-- openCV Python
+- torchvision
+- tensorboard
+- cocoapi
+- OpenCV Python
 - tqdm
 - cython
+- CUDA >= 10
 
 ### Step-by-step installation
 
