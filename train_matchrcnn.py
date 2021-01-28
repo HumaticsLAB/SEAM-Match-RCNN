@@ -1,7 +1,7 @@
-from torchvision.transforms import transforms as T
+from stuffs import transform as T
 from datasets.DF2Dataset import DeepFashion2Dataset, get_dataloader
 import torch
-from models.maskrcnn import matchrcnn_resnet50_fpn, custom_params
+from models.maskrcnn import matchrcnn_resnet50_fpn
 from stuffs.engine import train_one_epoch_matchrcnn
 import os
 import torch.distributed as dist
@@ -20,9 +20,7 @@ def get_transform(train):
     return T.Compose(transforms)
 
 
-# DistributedDataParallel tutorial @ https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
-
-# run with python -m torch.distributed.launch --nproc_per_node #GPUs train.py
+# run with python -m torch.distributed.launch --nproc_per_node #GPUs train_matchrcnn.py
 
 
 def train(args):
@@ -60,9 +58,13 @@ def train(args):
     # ------------------------------------------------------------------------------------------------------------------
 
     # MODEL ------------------------------------------------------------------------------------------------------------
-
-    model = matchrcnn_resnet50_fpn(pretrained_backbone=True, num_classes=14, **custom_params)
+    from models.maskrcnn import params as c_params
+    model = matchrcnn_resnet50_fpn(pretrained_backbone=True, num_classes=14, **c_params)
     model.to(device)
+    # if distributed:
+    #     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_map[rank]]
+    #                                                       , output_device=gpu_map[rank])
+
 
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -116,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument("--gpus", type=str, default="0,1")
     parser.add_argument("--n_workers", type=int, default=8)
 
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--root_train", type=str, default='/media/data/cjoppi/deepfashion2/train/image')
     parser.add_argument("--train_annots", type=str, default='/media/data/cjoppi/deepfashion2/train/annots.json')
 

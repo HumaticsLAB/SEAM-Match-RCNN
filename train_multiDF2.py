@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--frames_per_shop_train", type=int, default=10)
     parser.add_argument("--frames_per_shop_test", type=int, default=10)
-    parser.add_argument("--n_shops", type=int, default=16)
+    parser.add_argument("--n_shops", type=int, default=8)
     parser.add_argument("--root_train", type=str, default='/media/data/cjoppi/deepfashion2/train/image')
     parser.add_argument("--root_test", type=str, default='/media/data/cjoppi/deepfashion2/validation/image')
     parser.add_argument("--train_annots", type=str, default='/media/data/cjoppi/deepfashion2/train/annots.json')

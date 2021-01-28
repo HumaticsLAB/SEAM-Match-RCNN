@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-
+from pycocotools import mask as maskUtils
 from .nlb import NONLocalBlock1D
 
 
@@ -201,8 +201,6 @@ class MatchLoss(object):
         loss = self.criterion(logits, gts)
         if loss > 1.0:
             loss = loss / 2.0
-        # loss = - torch.mean(
-        #     gts * torch.log(logits[..., 1]) + (1 - gts) * torch.log(logits[..., 0]))
         return loss
 
 
@@ -450,4 +448,78 @@ class AggregationMatchLossDF2(object):
         gts = gts.view(-1).to(aggregator_logits.device).to(torch.int64)
         logits = aggregator_logits.view(-1, 2)
         loss = self.criterion(logits, gts)
+        return loss
+
+
+def filter_proposals(proposals, mask_roi_features, gt_proposals, matched_idxs):
+    match_imgs_mask = []
+    new_mask_roi_features = []
+    for i, pr_prop in enumerate(proposals):
+        g_prop = gt_proposals[i]
+        match_idxs = matched_idxs[i]
+        match_imgs_mask = match_imgs_mask + ([i] * match_idxs.size(0))
+
+        n_valid = g_prop.size(0)
+        ious = torch.FloatTensor(
+            maskUtils.iou(pr_prop.detach().cpu().numpy(), g_prop.detach().cpu().numpy(),
+                          [0] * n_valid)).squeeze()
+        if len(pr_prop) > 1:
+            topKidxs = torch.argsort(ious, descending=True, dim=0)[
+                       :torch.min(torch.tensor([(8 // n_valid), len(pr_prop)]))].view(-1)
+            proposals[i] = pr_prop[topKidxs, :]
+            matched_idxs[i] = match_idxs[topKidxs]
+            new_mask_roi_features.append(mask_roi_features[torch.where(torch.IntTensor(match_imgs_mask) == i)[0], ...])
+            new_mask_roi_features[i] = new_mask_roi_features[i][topKidxs, ...]
+        else:
+            new_mask_roi_features.append(mask_roi_features[torch.where(torch.IntTensor(match_imgs_mask) == i)[0], ...])
+
+    return proposals, torch.cat(new_mask_roi_features), matched_idxs
+
+
+class MatchLossPreTrained(object):
+    def __init__(self):
+        super(MatchLossPreTrained, self).__init__()
+        self.criterion = nn.CrossEntropyLoss()
+
+    def __call__(self, logits, proposals, gt_proposals, gt_pairs, gt_styles, types, matched_idxs):
+
+        target_pairs = [l[idxs] for l, idxs in zip(gt_pairs, matched_idxs)]
+        target_styles = [l[idxs] for l, idxs in zip(gt_styles, matched_idxs)]
+        # target_pairs, target_styles = self._prepare_target(proposals, targets)
+
+        target_pairs_user = torch.cat(target_pairs)[types == 0]
+        target_styles_user = torch.cat(target_styles)[types == 0]
+
+        target_pairs_shop = torch.cat(target_pairs)[types == 1]
+        target_styles_shop = torch.cat(target_styles)[types == 1]
+
+        gts = torch.zeros(len(target_pairs_user), len(target_pairs_shop), dtype=torch.int64).to(logits.device)
+        for i in range(len(target_pairs_user)):
+            for j in range(len(target_pairs_shop)):
+                tpu = target_pairs_user[i]
+                tps = target_pairs_shop[j]
+                tsu = target_styles_user[i]
+                tss = target_styles_shop[j]
+                if tps == tpu and tsu == tss and tss != 0 and tsu != 0:
+                    gts[i, j] = 1
+                else:
+                    gts[i, j] = 0
+
+        gts = gts.view(-1)
+
+        # idx1 = torch.where(gts == 1)[0]
+        # idx0 = torch.where(gts == 0)[0]
+        # idx0 = torch.randperm(idx0.size(0))[:idx1.size(0)*2].to(idx1.device)
+        #
+        # keep_idxs = torch.cat([idx0, idx1], dim=0)
+        logits = logits.view(-1, 2)
+        loss = self.criterion(logits, gts)
+
+        # loss = self.criterion(logits[keep_idxs, :], gts[keep_idxs])
+        if loss > 1.0:
+            # print("Dimezzo!")
+            loss = loss / 2.0
+            # loss = - torch.mean(
+            #     gts * torch.log(logits[..., 1]) + (1 - gts) * torch.log(logits[..., 0]))
+
         return loss

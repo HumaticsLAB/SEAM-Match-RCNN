@@ -1,16 +1,17 @@
 import torch
-import torch.nn.functional as F
-from torch.hub import load_state_dict_from_url
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.mask_rcnn import MaskRCNN
+from torch.hub import load_state_dict_from_url
+from torchvision.ops import boxes as box_ops
+import torch.nn.functional as F
 from torchvision.models.detection.roi_heads import fastrcnn_loss, maskrcnn_loss, maskrcnn_inference
+from .match_head import MatchPredictor, MatchLossPreTrained, filter_proposals
+
+
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.ops import MultiScaleRoIAlign
-from torchvision.ops import boxes as box_ops
 
-from .match_head import MatchPredictor, MatchLoss
-
-custom_params = {
+params = {
     'rpn_anchor_generator': AnchorGenerator((32, 64, 128, 256, 512), (0.5, 1.0, 2.0)),
     'rpn_pre_nms_top_n_train': 2000,
     'rpn_pre_nms_top_n_test': 1000,
@@ -18,11 +19,11 @@ custom_params = {
     'rpn_post_nms_top_n_train': 8000,
 
     'box_roi_pool': MultiScaleRoIAlign(
-        featmap_names=[0, 1, 2, 3],
+        featmap_names=['0', '1', '2', '3'],
         output_size=7,
         sampling_ratio=2),
     'mask_roi_pool': MultiScaleRoIAlign(
-        featmap_names=[0, 1, 2, 3],
+        featmap_names=['0', '1', '2', '3'],
         output_size=14,
         sampling_ratio=2),
     # 'image_mean': [0.60781138, 0.57332054, 0.55193729],
@@ -48,16 +49,23 @@ class NewRoIHeads(torch.nn.Module):
         self.mask_roi_pool = orh.mask_roi_pool
         self.mask_head = orh.mask_head
         self.mask_predictor = orh.mask_predictor
-        # self.mask_roi_pool = None
-        # self.mask_head = None
-        # self.mask_predictor = None
 
         self.match_predictor = MatchPredictor()
-        self.match_loss = MatchLoss()
+        self.match_loss = MatchLossPreTrained()
 
-        self.keypoint_roi_pool = orh.keypoint_head
-        self.keypoint_head = orh.keypoint_head
-        self.keypoint_predictor = orh.keypoint_predictor
+        # self.keypoint_roi_pool = MultiScaleRoIAlign(
+        #     featmap_names=[0, 1, 2, 3],
+        #     output_size=14,
+        #     sampling_ratio=2)
+        #
+        # keypoint_layers = tuple(512 for _ in range(8))
+        # self.keypoint_head = KeypointRCNNHeads(256, keypoint_layers)
+        # self.keypoint_predictor = KeypointRCNNPredictor(512, num_keypoints=294)
+        #
+        # #
+        self.keypoint_roi_pool = None
+        self.keypoint_head = None
+        self.keypoint_predictor = None
 
         self.score_thresh = orh.score_thresh
         self.nms_thresh = orh.nms_thresh
@@ -170,6 +178,117 @@ class NewRoIHeads(torch.nn.Module):
         regression_targets = self.box_coder.encode(matched_gt_boxes, proposals)
         return proposals, matched_idxs, labels, regression_targets
 
+    def keypoints_to_heatmap(self, keypoints, rois, heatmap_size):
+        offset_x = rois[:, 0]
+        offset_y = rois[:, 1]
+        scale_x = heatmap_size / (rois[:, 2] - rois[:, 0])
+        scale_y = heatmap_size / (rois[:, 3] - rois[:, 1])
+
+        offset_x = offset_x[:, None]
+        offset_y = offset_y[:, None]
+        scale_x = scale_x[:, None]
+        scale_y = scale_y[:, None]
+
+        x = keypoints[..., 0]
+        y = keypoints[..., 1]
+
+        x_boundary_inds = x == rois[:, 2][:, None]
+        y_boundary_inds = y == rois[:, 3][:, None]
+
+        x = (x - offset_x) * scale_x
+        x = x.floor().long()
+        y = (y - offset_y) * scale_y
+        y = y.floor().long()
+
+        x[x_boundary_inds] = heatmap_size - 1
+        y[y_boundary_inds] = heatmap_size - 1
+
+        valid_loc = (x >= 0) & (y >= 0) & (x < heatmap_size) & (y < heatmap_size)
+        vis = keypoints[..., 2] > 0
+        valid = (valid_loc & vis).long()
+
+        lin_ind = y * heatmap_size + x
+        heatmaps = lin_ind * valid
+
+        return heatmaps, valid
+
+    def heatmaps_to_keypoints(self, maps, rois):
+        """Extract predicted keypoint locations from heatmaps. Output has shape
+        (#rois, 4, #keypoints) with the 4 rows corresponding to (x, y, logit, prob)
+        for each keypoint.
+        """
+        # This function converts a discrete image coordinate in a HEATMAP_SIZE x
+        # HEATMAP_SIZE image to a continuous keypoint coordinate. We maintain
+        # consistency with keypoints_to_heatmap_labels by using the conversion from
+        # Heckbert 1990: c = d + 0.5, where d is a discrete coordinate and c is a
+        # continuous coordinate.
+        offset_x = rois[:, 0]
+        offset_y = rois[:, 1]
+
+        widths = rois[:, 2] - rois[:, 0]
+        heights = rois[:, 3] - rois[:, 1]
+        widths = widths.clamp(min=1)
+        heights = heights.clamp(min=1)
+        widths_ceil = widths.ceil()
+        heights_ceil = heights.ceil()
+
+        num_keypoints = maps.shape[1]
+        xy_preds = torch.zeros((len(rois), 3, num_keypoints), dtype=torch.float32, device=maps.device)
+        end_scores = torch.zeros((len(rois), num_keypoints), dtype=torch.float32, device=maps.device)
+        for i in range(len(rois)):
+            roi_map_width = int(widths_ceil[i].item())
+            roi_map_height = int(heights_ceil[i].item())
+            width_correction = widths[i] / roi_map_width
+            height_correction = heights[i] / roi_map_height
+            roi_map = torch.nn.functional.interpolate(
+                maps[i][None], size=(roi_map_height, roi_map_width), mode='bicubic', align_corners=False)[0]
+            # roi_map_probs = scores_to_probs(roi_map.copy())
+            w = roi_map.shape[2]
+            pos = roi_map.reshape(num_keypoints, -1).argmax(dim=1)
+            x_int = pos % w
+            y_int = (pos - x_int) // w
+            # assert (roi_map_probs[k, y_int, x_int] ==
+            #         roi_map_probs[k, :, :].max())
+            x = (x_int.float() + 0.5) * width_correction
+            y = (y_int.float() + 0.5) * height_correction
+            xy_preds[i, 0, :] = x + offset_x[i]
+            xy_preds[i, 1, :] = y + offset_y[i]
+            xy_preds[i, 2, :] = 1
+            end_scores[i, :] = roi_map[torch.arange(num_keypoints), y_int, x_int]
+
+        return xy_preds.permute(0, 2, 1), end_scores
+
+    def keypointrcnn_loss(self, keypoint_logits, proposals, gt_keypoints, keypoint_matched_idxs):
+        N, K, H, W = keypoint_logits.shape
+        assert H == W
+        discretization_size = H
+        heatmaps = []
+        valid = []
+
+        indx = [x for x in gt_keypoints]
+
+        for proposals_per_image, gt_kp_in_image, midx in zip(proposals, gt_keypoints, keypoint_matched_idxs):
+            kp = gt_kp_in_image[midx]
+            heatmaps_per_image, valid_per_image = self.keypoints_to_heatmap(
+                kp, proposals_per_image, discretization_size
+            )
+            heatmaps.append(heatmaps_per_image.view(-1))
+            valid.append(valid_per_image.view(-1))
+
+        keypoint_targets = torch.cat(heatmaps, dim=0)
+        valid = torch.cat(valid, dim=0).to(dtype=torch.uint8)
+        valid = torch.nonzero(valid).squeeze(1)
+
+        # torch.mean (in binary_cross_entropy_with_logits) does'nt
+        # accept empty tensors, so handle it sepaartely
+        if keypoint_targets.numel() == 0 or len(valid) == 0:
+            return keypoint_logits.sum() * 0
+
+        keypoint_logits = keypoint_logits.view(N * K, H * W)
+
+        keypoint_loss = F.cross_entropy(keypoint_logits[valid], keypoint_targets[valid])
+        return keypoint_loss
+
     def postprocess_detections(self, class_logits, box_regression, proposals, image_shapes):
         device = class_logits.device
         num_classes = class_logits.shape[-1]
@@ -241,8 +360,8 @@ class NewRoIHeads(torch.nn.Module):
         if self.training:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
 
-        box_features = self.box_roi_pool(features, proposals, image_shapes)
-        box_features = self.box_head(box_features)
+        box_features_roi = self.box_roi_pool(features, proposals, image_shapes)
+        box_features = self.box_head(box_features_roi)
         class_logits, box_regression = self.box_predictor(box_features)
 
         result, losses = [], {}
@@ -254,13 +373,23 @@ class NewRoIHeads(torch.nn.Module):
             boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
             num_images = len(boxes)
             for i in range(num_images):
-                result.append(
-                    dict(
-                        boxes=boxes[i],
-                        labels=labels[i],
-                        scores=scores[i],
+                if boxes[i].numel() > 0:
+                    result.append(
+                        dict(
+                            boxes=boxes[i],
+                            labels=labels[i],
+                            scores=scores[i],
+                        )
                     )
-                )
+                else:
+                    result.append(
+                        dict(
+                            boxes=torch.tensor([0.0, 0.0, image_shapes[i][1], image_shapes[i][0]]).to(
+                                boxes[i].device).unsqueeze(0),
+                            labels=torch.tensor([0]).to(boxes[i].device),
+                            scores=torch.tensor([1.0]).to(boxes[i].device),
+                        )
+                    )
 
         if self.has_mask:
             mask_proposals = [p["boxes"] for p in result]
@@ -295,10 +424,20 @@ class NewRoIHeads(torch.nn.Module):
             losses.update(loss_mask)
 
         if self.has_match:
+            match_proposals = [p["boxes"] for p in result]
             if self.training:
                 gt_proposals = [t["boxes"] for t in targets]
-                match_proposals, mask_roi_features, matched_idxs_match = filter_proposals(mask_proposals,
-                                                                                          mask_roi_features,
+                num_images = len(proposals)
+                match_proposals = []
+                pos_matched_idxs = []
+                for img_id in range(num_images):
+                    pos = torch.nonzero(labels[img_id] > 0).squeeze(1)
+                    match_proposals.append(proposals[img_id][pos])
+                    pos_matched_idxs.append(matched_idxs[img_id][pos])
+
+                match_roi_features = self.mask_roi_pool(features, match_proposals, image_shapes)
+                match_proposals, mask_roi_features, matched_idxs_match = filter_proposals(match_proposals,
+                                                                                          match_roi_features,
                                                                                           gt_proposals,
                                                                                           pos_matched_idxs)
                 types = []
@@ -325,7 +464,7 @@ class NewRoIHeads(torch.nn.Module):
                 loss_match = {}
 
                 s_imgs = []
-                for i, p in enumerate(mask_proposals):
+                for i, p in enumerate(match_proposals):
                     if i == 0:
                         types = [0] * len(p)
                     else:
@@ -333,8 +472,9 @@ class NewRoIHeads(torch.nn.Module):
                     s_imgs = s_imgs + ([i] * len(p))
 
                 types = torch.IntTensor(types)
-                final_features, match_logits = self.match_predictor(mask_roi_features, types)
-                for i, r in zip(range(len(mask_proposals)), result):
+                match_roi_features = self.mask_roi_pool(features, match_proposals, image_shapes)
+                final_features, match_logits = self.match_predictor(match_roi_features, types)
+                for i, r in zip(range(len(match_proposals)), result):
                     r['match_features'] = final_features[torch.IntTensor(s_imgs) == i, ...]
                     r['w'] = self.match_predictor.last.weight
                     r['b'] = self.match_predictor.last.bias
@@ -344,12 +484,10 @@ class NewRoIHeads(torch.nn.Module):
         return result, losses
 
 
-
 class MatchRCNN(MaskRCNN):
     def __init__(self, backbone, num_classes, **kwargs):
         super(MatchRCNN, self).__init__(backbone, num_classes, **kwargs)
         self.roi_heads = NewRoIHeads(self.roi_heads)
-
 
 
 def matchrcnn_resnet50_fpn(pretrained=False, progress=True,

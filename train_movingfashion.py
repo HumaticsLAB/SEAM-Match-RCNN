@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--num_epochs", type=int, default=31)
     parser.add_argument("--milestones", type=int, default=[15, 25])
-    parser.add_argument("--learning_rate", type=float, default=0.02)
+    parser.add_argument("--learning_rate", type=float, default=0.04) #Please consider also the number of GPU
     parser.add_argument("--pretrained_path", type=str, default="/media/data/mgodi/match_rcnn_clean/weights/df2matchrcnn")
 
     parser.add_argument("--print_freq", type=int, default=20)
