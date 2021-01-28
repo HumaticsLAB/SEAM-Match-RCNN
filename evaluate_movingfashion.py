@@ -440,11 +440,11 @@ if __name__ == '__main__':
     parser.add_argument("--fixed_frame", type=int, default=None)
     parser.add_argument("--score_threshold", type=float, default=0.0)
 
-    parser.add_argument("--root", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion")
-    parser.add_argument("--test_annots", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion/test.json")
+    parser.add_argument("--root", type=str, default="data/MovingFashion")
+    parser.add_argument("--test_annots", type=str, default="data/MovingFashion/test.json")
     parser.add_argument("--noise", type=bool, default=True)
 
-    parser.add_argument('--ckpt_path',type=str, default="...")
+    parser.add_argument('--ckpt_path',type=str, default="ckpt/SEAM/MovingFashion/MF_epoch031")
 
     args = parser.parse_args()
 
