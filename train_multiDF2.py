@@ -146,24 +146,24 @@ if __name__ == '__main__':
     parser.add_argument("--frames_per_shop_train", type=int, default=10)
     parser.add_argument("--frames_per_shop_test", type=int, default=10)
     parser.add_argument("--n_shops", type=int, default=8)
-    parser.add_argument("--root_train", type=str, default='/media/data/cjoppi/deepfashion2/train/image')
-    parser.add_argument("--root_test", type=str, default='/media/data/cjoppi/deepfashion2/validation/image')
-    parser.add_argument("--train_annots", type=str, default='/media/data/cjoppi/deepfashion2/train/annots.json')
-    parser.add_argument("--test_annots", type=str, default='/media/data/cjoppi/deepfashion2/validation/annots.json')
+    parser.add_argument("--root_train", type=str, default='data/deepfashion2/train/image')
+    parser.add_argument("--root_test", type=str, default='data/deepfashion2/validation/image')
+    parser.add_argument("--train_annots", type=str, default='data/deepfashion2/train/annots.json')
+    parser.add_argument("--test_annots", type=str, default='data/deepfashion2/validation/annots.json')
     parser.add_argument("--noise", type=bool, default=True)
 
     parser.add_argument("--num_epochs", type=int, default=31)
     parser.add_argument("--milestones", type=int, default=[15, 25])
     parser.add_argument("--learning_rate", type=float, default=0.02)
     parser.add_argument("--pretrained_path", type=str,
-                        default="/media/data/mgodi/match_rcnn_clean/weights/df2matchrcnn")
+                        default="pre-trained/df2matchrcnn")
 
     parser.add_argument("--print_freq", type=int, default=20)
     parser.add_argument("--eval_freq", type=int, default=4)
     parser.add_argument("--save_epochs", type=int, default=2)
 
-    parser.add_argument('--save_path', type=str, default="/media/data/cjoppi/CVPR2021/SEAM/models_df2")
-    parser.add_argument('--save_tag', type=str, default="DF2")
+    parser.add_argument('--save_path', type=str, default="ckpt/SEAM")
+    parser.add_argument('--save_tag', type=str, default="multiDF2")
 
     args = parser.parse_args()
 
