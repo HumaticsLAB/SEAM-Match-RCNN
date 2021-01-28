@@ -7,7 +7,10 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 ###Requirements:
 - Pytorch 1.5.1 or more, with cudatoolkit (10.2)
 - Torchvision
-- cocoapi
+- Tensorboard
+- cocoApi
+- openCV Python
+- tqdm
 
 ###Step-by-step installation
 
@@ -19,11 +22,12 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 conda create --name seam_matchrcnn -y python=3
 conda activate seam_matchrcnn
 
+pip install cython tqdm matplotlib numpy opencv-python
+
 # follow PyTorch installation in https://pytorch.org/get-started/locally/
 conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
 
-pip install tqdm matplotlib numpy opencv-python
-
+conda install tensorboard
 
 export INSTALL_DIR=$PWD
 
@@ -35,9 +39,8 @@ python setup.py build_ext install
 
 # download SEAM
 cd $INSTALL_DIR
-git clone 
-
-
+git clone https://github.com/VIPS4/SEAM-Match-RCNN.git
+cd SEAM-Match-RCNN
 
 unset INSTALL_DIR
 ```
@@ -47,7 +50,7 @@ unset INSTALL_DIR
 
 Qua va prima addestrato Match, poiSEAM
 ### Single GPU
-
+python train_movingfashion
 
 ### Multi GPU
 
