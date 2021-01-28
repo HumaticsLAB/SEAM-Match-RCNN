@@ -339,11 +339,11 @@ if __name__ == '__main__':
     parser.add_argument("--fixed_frame", type=int, default=None)
     parser.add_argument("--score_threshold", type=float, default=0.0)
 
-    parser.add_argument("--root_test", type=str, default='/media/data/cjoppi/deepfashion2/validation/image')
-    parser.add_argument("--test_annots", type=str, default='/media/data/cjoppi/deepfashion2/validation/annots.json')
+    parser.add_argument("--root_test", type=str, default='data/deepfashion2/validation/image')
+    parser.add_argument("--test_annots", type=str, default='data/deepfashion2/validation/annots.json')
     parser.add_argument("--noise", type=bool, default=True)
 
-    parser.add_argument('--ckpt_path', type=str, default="/media/data/cjoppi/CVPR2021/SEAM/models_df2/DF2_epoch000")
+    parser.add_argument('--ckpt_path', type=str, default="ckpt/SEAM/multiDF2/DF2_epoch031")
 
     args = parser.parse_args()
 
