@@ -153,22 +153,22 @@ if __name__ == '__main__':
     parser.add_argument("--frames_per_shop_train", type=int, default=10)
     parser.add_argument("--frames_per_shop_test", type=int, default=10)
     parser.add_argument("--n_shops", type=int, default=16)
-    parser.add_argument("--root", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion")
-    parser.add_argument("--train_annots", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion/train.json")
-    parser.add_argument("--test_annots", type=str, default="/home/cjoppi/Documenti/CVPR2021/MovingFashion/test.json")
+    parser.add_argument("--root", type=str, default="data/MovingFashion")
+    parser.add_argument("--train_annots", type=str, default="data/MovingFashion/train.json")
+    parser.add_argument("--test_annots", type=str, default="data/MovingFashion/test.json")
     parser.add_argument("--noise", type=bool, default=True)
 
     parser.add_argument("--num_epochs", type=int, default=31)
     parser.add_argument("--milestones", type=int, default=[15, 25])
     parser.add_argument("--learning_rate", type=float, default=0.04) #Please consider also the number of GPU
-    parser.add_argument("--pretrained_path", type=str, default="/media/data/mgodi/match_rcnn_clean/weights/df2matchrcnn")
+    parser.add_argument("--pretrained_path", type=str, default="pre-trained/df2matchrcnn")
 
     parser.add_argument("--print_freq", type=int, default=20)
     parser.add_argument("--eval_freq", type=int, default=4)
     parser.add_argument("--save_epochs", type=int, default=2)
 
-    parser.add_argument('--save_path',type=str, default="/media/data/cjoppi/CVPR2021/SEAM/models")
-    parser.add_argument('--save_tag', type=str, default="NLB")
+    parser.add_argument('--save_path',type=str, default="ckpt/SEAM")
+    parser.add_argument('--save_tag', type=str, default="MovingFashion")
 
     args = parser.parse_args()
 
