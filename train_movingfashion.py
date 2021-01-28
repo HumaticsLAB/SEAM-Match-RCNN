@@ -167,8 +167,8 @@ if __name__ == '__main__':
     parser.add_argument("--eval_freq", type=int, default=4)
     parser.add_argument("--save_epochs", type=int, default=2)
 
-    parser.add_argument('--save_path',type=str, default="ckpt/SEAM")
-    parser.add_argument('--save_tag', type=str, default="MovingFashion")
+    parser.add_argument('--save_path',type=str, default="ckpt/SEAM/MovingFashion")
+    parser.add_argument('--save_tag', type=str, default="MF")
 
     args = parser.parse_args()
 
