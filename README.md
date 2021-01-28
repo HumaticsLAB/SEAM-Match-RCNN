@@ -11,6 +11,7 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 - cocoApi
 - openCV Python
 - tqdm
+- cython
 
 ### Step-by-step installation
 
@@ -22,7 +23,7 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 conda create --name seam_matchrcnn -y python=3
 conda activate seam_matchrcnn
 
-pip install cython tqdm matplotlib numpy opencv-python
+pip install cython tqdm opencv-python
 
 # follow PyTorch installation in https://pytorch.org/get-started/locally/
 conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
