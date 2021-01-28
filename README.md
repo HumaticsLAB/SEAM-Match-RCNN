@@ -53,6 +53,8 @@ unset INSTALL_DIR
 SEAM Match-RCNN has been trained and test on MovingFashion and DeepFashion2 datasets.
 Follow the instruction to download and extract the datasets.
 
+We suggest to download dataset inside a folder called 'data'.
+
 ### MovingFashion
 
 
