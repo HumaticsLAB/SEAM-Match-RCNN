@@ -61,10 +61,6 @@ def train(args):
     from models.maskrcnn import params as c_params
     model = matchrcnn_resnet50_fpn(pretrained_backbone=True, num_classes=14, **c_params)
     model.to(device)
-    # if distributed:
-    #     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu_map[rank]]
-    #                                                       , output_device=gpu_map[rank])
-
 
     # ------------------------------------------------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 from torch import nn
-
+import torch
 
 class _NonLocalBlockND(nn.Module):
     def __init__(self, in_channels, inter_channels=None, dimension=3, sub_sample=True, bn_layer=True):
