@@ -4,7 +4,7 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 
 ## Installation
 
-###Requirements:
+### Requirements:
 - Pytorch 1.5.1 or more, with cudatoolkit (10.2)
 - Torchvision
 - Tensorboard
@@ -12,7 +12,7 @@ Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Stre
 - openCV Python
 - tqdm
 
-###Step-by-step installation
+### Step-by-step installation
 
 ```bash
 # first, make sure that your conda is setup properly with the right environment
