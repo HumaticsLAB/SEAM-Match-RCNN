@@ -115,8 +115,8 @@ if __name__ == '__main__':
     parser.add_argument("--n_workers", type=int, default=8)
 
     parser.add_argument("--batch_size", type=int, default=8)
-    parser.add_argument("--root_train", type=str, default='/media/data/cjoppi/deepfashion2/train/image')
-    parser.add_argument("--train_annots", type=str, default='/media/data/cjoppi/deepfashion2/train/annots.json')
+    parser.add_argument("--root_train", type=str, default='data/deepfashion2/train/image')
+    parser.add_argument("--train_annots", type=str, default='data/deepfashion2/train/annots.json')
 
     parser.add_argument("--num_epochs", type=int, default=12)
     parser.add_argument("--milestones", type=int, default=[6, 9])
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument("--print_freq", type=int, default=100)
     parser.add_argument("--save_epochs", type=int, default=2)
 
-    parser.add_argument('--save_path', type=str, default="/media/data/cjoppi/CVPR2021/MATCHRCNN/")
+    parser.add_argument('--save_path', type=str, default="ckpt/matchrcnn")
     parser.add_argument('--save_tag', type=str, default="DF2-pretraining")
 
     args = parser.parse_args()
