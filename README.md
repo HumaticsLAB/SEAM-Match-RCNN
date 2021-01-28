@@ -45,6 +45,8 @@ python setup.py build_ext install
 cd $INSTALL_DIR
 git clone https://github.com/VIPS4/SEAM-Match-RCNN.git
 cd SEAM-Match-RCNN
+mkdir data
+mkdir ckpt
 
 unset INSTALL_DIR
 ```
@@ -53,7 +55,7 @@ unset INSTALL_DIR
 SEAM Match-RCNN has been trained and test on MovingFashion and DeepFashion2 datasets.
 Follow the instruction to download and extract the datasets.
 
-We suggest to download dataset inside a folder called **data**.
+We suggest to download the datasets inside the folder **data**.
 
 ### MovingFashion
 
