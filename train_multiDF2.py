@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from datasets.MultiDF2Dataset import MultiDeepFashion2Dataset, get_dataloader
 from evaluate_multiDF2 import evaluate
-from models.video_maskrcnn import videomatchrcnn_resnet50_fpn
+from models.video_matchrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
 from stuffs.engine import train_one_epoch_multiDF2
 
@@ -134,6 +134,9 @@ def train(args):
         'optimizer_state_dict': optimizer.state_dict(),
         'scheduler_state_dict': lr_scheduler.state_dict()
     }, os.path.join(args.save_path, (args.save_tag + "_epoch%03d") % args.num_epochs))
+    if rank == 0:
+        model.eval()
+        _ = evaluate(model, data_loader_test, device, frames_per_product=args.frames_per_shop_test)
     print("That's it!")
 
 

@@ -9,7 +9,7 @@ from pycocotools import mask as maskUtils
 from tqdm import tqdm
 
 from datasets.MultiDF2Dataset import MultiDeepFashion2Dataset, get_dataloader
-from models.video_maskrcnn import videomatchrcnn_resnet50_fpn
+from models.video_matchrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
 
 

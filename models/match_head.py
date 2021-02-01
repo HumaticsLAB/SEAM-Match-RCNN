@@ -87,6 +87,7 @@ class TemporalAggregationNLB(MatchPredictor):
         self.n_frames = -1
         self.attention_scorer = nn.Linear(d_model, 1)
         self.newnlb = NONLocalBlock1D(in_channels=d_model, sub_sample=False, bn_layer=False)
+        self.nlb = True
 
     def forward(self, x, types, ids, x3_1_seq=None, x3_1_mask=None, x3_2=None, getatt=False):
         # x should be (K*(n_frames + 1))x256x14x14 where the one is shop and the n_frames are frames
@@ -112,15 +113,17 @@ class TemporalAggregationNLB(MatchPredictor):
                     x3_1_list.append(x3_1[x3_1_ids == idd])
 
 
-                x3_1_list2 = [self.newnlb(x.transpose(0, 1).unsqueeze(0))[0].transpose(0, 1)
-                             if x.shape[0] > 1 else x
-                             for x in x3_1_list]
+                if self.nlb:
+                    x3_1_list = [self.newnlb(x.transpose(0, 1).unsqueeze(0))[0].transpose(0, 1)
+                                 if x.shape[0] > 1 else x
+                                 for x in x3_1_list]
+
                 x3_1b = [(F.softmax(self.attention_scorer(x), 0) * x3_1_list[i]).sum(0).unsqueeze(0)
-                         for i, x in enumerate(x3_1_list2)]
+                         for i, x in enumerate(x3_1_list)]
                 x3_1b = torch.cat(x3_1b, 0)
 
                 if getatt:
-                    attention_scores = [F.softmax(self.attention_scorer(x), 0) for x in x3_1_list2]
+                    attention_scores = [F.softmax(self.attention_scorer(x), 0) for x in x3_1_list]
 
                 x3_1c = x3_1b.unsqueeze(1)
             else:
@@ -140,11 +143,13 @@ class TemporalAggregationNLB(MatchPredictor):
 
 
 
-            x3_1_list2 = [self.newnlb(x.transpose(0, 1).unsqueeze(0))[0].transpose(0, 1)
-                          if x.shape[0] > 1 else x
-                          for x in x3_1_list]
+            if self.nlb:
+                x3_1_list = [self.newnlb(x.transpose(0, 1).unsqueeze(0))[0].transpose(0, 1)
+                                 if x.shape[0] > 1 else x
+                                 for x in x3_1_list]
+
             x3_1b = [(F.softmax(self.attention_scorer(x), 0) * x3_1_list[i]).sum(0).unsqueeze(0)
-                     for i, x in enumerate(x3_1_list2)]
+                         for i, x in enumerate(x3_1_list)]
             x3_1b = torch.cat(x3_1b, 0)
 
             if getatt:

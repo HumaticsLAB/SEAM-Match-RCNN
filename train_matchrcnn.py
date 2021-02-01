@@ -1,7 +1,7 @@
 from stuffs import transform as T
 from datasets.DF2Dataset import DeepFashion2Dataset, get_dataloader
 import torch
-from models.maskrcnn import matchrcnn_resnet50_fpn
+from models.matchrcnn import matchrcnn_resnet50_fpn
 from stuffs.engine import train_one_epoch_matchrcnn
 import os
 import torch.distributed as dist
