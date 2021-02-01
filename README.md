@@ -50,7 +50,7 @@ mkdir ckpt
 
 unset INSTALL_DIR
 ```
-## Dataset and Pre-Trained models
+## Dataset
 
 SEAM Match-RCNN has been trained and test on MovingFashion and DeepFashion2 datasets.
 Follow the instruction to download and extract the datasets.
@@ -60,7 +60,6 @@ We suggest to download the datasets inside the folder **data**.
 ### MovingFashion
 
 
-Pre-trained model on MovingFashion is available to download [here](http://bit.ly/...). 
 
 ### Deepfashion2
 DeepFashion2 dataset is available [here](https://drive.google.com/drive/folders/125F48fsMBz2EF0Cpqk6aaHet5VH399Ok?usp=sharing). You need fill in the [form](https://docs.google.com/forms/d/e/1FAIpQLSeIoGaFfCQILrtIZPykkr8q_h9qQ5BoTYbjvf95aXbid0v2Bw/viewform?usp=sf_link) to get password for unzipping files.
@@ -68,19 +67,41 @@ DeepFashion2 dataset is available [here](https://drive.google.com/drive/folders/
 
 Once the dataset will be extracted, use the reserved DeepFtoCoco.py script to convert the annotations in COCO format, specifying dataset path.
 ```bash
-python DeepFtoCoco.pt --path <dataset_root>
+python DeepFtoCoco.py --path <dataset_root>
 ```
 
-Pre-trained model on MultiDeepfashion2 is available to download [here](http://bit.ly/3j8Vc9W). 
+
 
 ## Training
+We provide the scripts to train both Match-RCNN and SEAM Match-RCNN.
 
-Qua va prima addestrato Match, poiSEAM
 ### Single GPU
-python train_movingfashion
+```bash
+python train_matchrcnn.py
+
+#Now, we can train SEAM Match-RCNN
+
+#on movingfashion
+python train_movingfashion.py 
+
+#on multi-deepfashion2
+python train_multiDF2.py 
+```
+
 
 ### Multi GPU
+We use internally ```torch.distributed.launch``` in order to launch multi-gpu training. This utility function from PyTorch spawns as many Python processes as the number of GPUs we want to use, and each Python process will only use a single GPU.
 
+### Pre-Trained models
+It is possibile to use the pre-trained models instead of train the whole framework.
+
+[MatchRCNN] Pre-trained model on Deepfashion2 is available to download [here](https://bit.ly/3m3y6C4). This model can be used to start the training at the second phase (training directly SESEAM Match-RCNN.
+
+[SEAM Match-RCNN] Pre-trained model on MovingFashion is available to download [here](http://bit.ly/...). 
+
+[SEAM Match-RCNN] Pre-trained model on MultiDeepfashion2 is available to download [here](http://bit.ly/3j8Vc9W). 
+
+We suggest to download the models inside the folder **ckpt**. 
 ## Evaluation
 
 ## Citation
