@@ -73,24 +73,36 @@ python DeepFtoCoco.py --path <dataset_root>
 
 
 ## Training
-We provide the scripts to train both Match-RCNN and SEAM Match-RCNN.
+We provide the scripts to train both Match-RCNN and SEAM Match-RCNN. Check the scripts for all the possible parameters.
 
 ### Single GPU
 ```bash
-python train_matchrcnn.py
+#training of Match-RCNN
+python train_matchrcnn.py --root_train <path_of_images_folder> --train_annots <json_path> --save_path <save_path> 
 
-#Now, we can train SEAM Match-RCNN
+#training on movingfashion
+python train_movingfashion.py --root <path_of_dataset_root> --train_annots <json_path> --test_annots <json_path> --pretrained_path <path_of_matchrcnn_model>
 
-#on movingfashion
-python train_movingfashion.py 
 
-#on multi-deepfashion2
-python train_multiDF2.py 
+#training on multi-deepfashion2
+python train_multiDF2.py --root <path_of_dataset_root> --train_annots <json_path> --test_annots <json_path> --pretrained_path <path_of_matchrcnn_model>
 ```
 
 
 ### Multi GPU
 We use internally ```torch.distributed.launch``` in order to launch multi-gpu training. This utility function from PyTorch spawns as many Python processes as the number of GPUs we want to use, and each Python process will only use a single GPU.
+
+```bash
+#training of Match-RCNN
+python -m torch.distributed.launch --nproc_per_node=<NUM_GPUS> train_matchrcnn.py --root_train <path_of_images_folder> --train_annots <json_path> --save_path <save_path>
+
+#training on movingfashion
+python -m torch.distributed.launch --nproc_per_node=<NUM_GPUS> train_movingfashion.py --root <path_of_dataset_root> --train_annots <json_path> --test_annots <json_path> --pretrained_path <path_of_matchrcnn_model> 
+
+#training on multi-deepfashion2
+python -m torch.distributed.launch --nproc_per_node=<NUM_GPUS> train_multiDF2.py --root <path_of_dataset_root> --train_annots <json_path> --test_annots <json_path> --pretrained_path <path_of_matchrcnn_model> 
+```
+
 
 ### Pre-Trained models
 It is possibile to use the pre-trained models instead of train the whole framework.
