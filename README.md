@@ -59,7 +59,8 @@ We suggest to download the datasets inside the folder **data**.
 
 ### MovingFashion
 
-
+MovingFashion dataset is available [here](https://movingfashion.github.io/).
+There's no need of pre-processing steps. The dataset is ready for use. 
 
 ### Deepfashion2
 DeepFashion2 dataset is available [here](https://drive.google.com/drive/folders/125F48fsMBz2EF0Cpqk6aaHet5VH399Ok?usp=sharing). You need fill in the [form](https://docs.google.com/forms/d/e/1FAIpQLSeIoGaFfCQILrtIZPykkr8q_h9qQ5BoTYbjvf95aXbid0v2Bw/viewform?usp=sf_link) to get password for unzipping files.
