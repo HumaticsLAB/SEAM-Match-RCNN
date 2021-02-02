@@ -117,5 +117,14 @@ It is possibile to use the pre-trained models instead of train the whole framewo
 We suggest to download the models inside the folder **ckpt**. 
 
 ## Evaluation
+To evaluate the models of SEAM Match-RCNN please use the following scripts.
+
+```bash
+#evaluation on movingfashion
+python evaluate_movingfashion.py --root_test <path_of_dataset_root> --test_annots <json_path> --ckpt_path <checkpoint_path>
+
+
+#evaluation on multi-deepfashion2
+python evaluate_multiDF2.py --root_test <path_of_dataset_root> --test_annots <json_path> --ckpt_path <checkpoint_path>
 
 ## Citation
