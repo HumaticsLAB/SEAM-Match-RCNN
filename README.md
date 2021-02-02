@@ -126,5 +126,10 @@ python evaluate_movingfashion.py --root_test <path_of_dataset_root> --test_annot
 
 #evaluation on multi-deepfashion2
 python evaluate_multiDF2.py --root_test <path_of_dataset_root> --test_annots <json_path> --ckpt_path <checkpoint_path>
+```
 
 ## Citation
+```
+BibTex
+```
+
