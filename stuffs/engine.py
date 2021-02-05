@@ -97,7 +97,6 @@ def train_one_epoch_movingfashion(model, optimizer, data_loader, device, epoch, 
     #     dist.barrier()
     real_model = model if not hasattr(model, "module") else model.module
     match_predictor = real_model.roi_heads.match_predictor
-    tracking_predictor = real_model.roi_heads.tracking_predictor
     temporal_aggregator = real_model.roi_heads.temporal_aggregator
 
 
@@ -119,7 +118,6 @@ def train_one_epoch_movingfashion(model, optimizer, data_loader, device, epoch, 
         output = [{k: v for k, v in o.items() if k in outputkeys_whitelist} for o in output]
 
         match_predictor.train()
-        tracking_predictor.train()
         temporal_aggregator.train()
 
         roi_features = []
