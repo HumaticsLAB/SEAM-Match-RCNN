@@ -26,8 +26,6 @@ params = {
         featmap_names=['0', '1', '2', '3'],
         output_size=14,
         sampling_ratio=2),
-    # 'image_mean': [0.60781138, 0.57332054, 0.55193729],
-    # 'image_std': [0.06657078, 0.06587644, 0.06175072]
 }
 
 
@@ -53,16 +51,6 @@ class NewRoIHeads(torch.nn.Module):
         self.match_predictor = MatchPredictor()
         self.match_loss = MatchLossPreTrained()
 
-        # self.keypoint_roi_pool = MultiScaleRoIAlign(
-        #     featmap_names=[0, 1, 2, 3],
-        #     output_size=14,
-        #     sampling_ratio=2)
-        #
-        # keypoint_layers = tuple(512 for _ in range(8))
-        # self.keypoint_head = KeypointRCNNHeads(256, keypoint_layers)
-        # self.keypoint_predictor = KeypointRCNNPredictor(512, num_keypoints=294)
-        #
-        # #
         self.keypoint_roi_pool = None
         self.keypoint_head = None
         self.keypoint_predictor = None
