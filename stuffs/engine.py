@@ -217,7 +217,6 @@ def train_one_epoch_multiDF2(model, optimizer, data_loader, device, epoch, print
         lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 
     match_predictor = model.roi_heads.match_predictor
-    tracking_predictor = model.roi_heads.tracking_predictor
     temporal_aggregator = model.roi_heads.temporal_aggregator
     aggregation_loss = AggregationMatchLossDF2(device, temporal_aggregator)
 
@@ -243,7 +242,6 @@ def train_one_epoch_multiDF2(model, optimizer, data_loader, device, epoch, print
         # torch.cuda.empty_cache()
 
         match_predictor.eval()
-        tracking_predictor.eval()
         temporal_aggregator.train()
         # print(args.local_rank)
 
