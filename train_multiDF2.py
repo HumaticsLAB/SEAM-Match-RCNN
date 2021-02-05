@@ -71,10 +71,17 @@ def train(args):
     model = videomatchrcnn_resnet50_fpn(pretrained_backbone=True, num_classes=14
                                         , n_frames=3)
 
-    savefile = torch.load(args.pretrained_path)
-    sd = savefile['model_state_dict']
-    sd = {".".join(k.split(".")[1:]): v for k, v in sd.items()}
-    model.load_saved_matchrcnn(sd)
+    if args.start_ckpt != None:
+        savefile = torch.load(args.start_ckpt)
+        start_ep = savefile['epoch'] + 1
+        model.load_state_dict(savefile['model_state_dict'])
+        pass
+    else:
+        savefile = torch.load(args.pretrained_path)
+        sd = savefile['model_state_dict']
+        sd = {".".join(k.split(".")[1:]): v for k, v in sd.items()}
+        model.load_saved_matchrcnn(sd)
+        start_ep = 0
     model.to(device)
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -87,7 +94,9 @@ def train(args):
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer
                                                         , milestones=args.milestones
                                                         , gamma=0.1)
-
+    if args.start_ckpt != None:
+        optimizer.load_state_dict(savefile['optimizer_state_dict'])
+        lr_scheduler.load_state_dict(savefile['scheduler_state_dict'])
     # ------------------------------------------------------------------------------------------------------------------
 
     if rank == 0:
@@ -158,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_epochs", type=int, default=31)
     parser.add_argument("--milestones", type=int, default=[15, 25])
     parser.add_argument("--learning_rate", type=float, default=0.02)
+    parser.add_argument("--start_ckpt", type=str, default=None) #Insert ckpt model path to restart training from a fixed epoch
     parser.add_argument("--pretrained_path", type=str,
                         default="pre-trained/df2matchrcnn")
 
