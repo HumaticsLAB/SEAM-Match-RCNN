@@ -30,14 +30,10 @@ class TemporalRoIHeads(torch.nn.Module):
         self.mask_roi_pool = orh.mask_roi_pool
         self.mask_head = orh.mask_head
         self.mask_predictor = orh.mask_predictor
-        # self.mask_roi_pool = None
-        # self.mask_head = None
-        # self.mask_predictor = None
 
         self.match_predictor = MatchPredictor()
         self.match_loss = MatchLoss()
 
-        self.tracking_predictor = deepcopy(self.match_predictor)
         self.temporal_aggregator = TemporalAggregation()
 
         self.keypoint_roi_pool = orh.keypoint_head
