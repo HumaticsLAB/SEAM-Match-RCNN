@@ -67,8 +67,6 @@ class MatchPredictor(nn.Module):
         x1 = self.conv_seq(x)
         x2 = self.pool(x1)
         x3 = self.linear(x2.view(x2.size(0), -1))
-        # TODO:  after linear there should be Substraction between different pairs, and element wise square...
-        # then, we can apply the final linear transformation (last) and the softmax function (output)
         x3_1 = x3[types == 0].unsqueeze(1)
         x3_2 = x3[types == 1].unsqueeze(0)
 
@@ -260,15 +258,7 @@ class NEWBalancedAggregationMatchLossWeak(object):
         self.temporal_aggregator = temporal_aggregator
 
     def __call__(self, match_logits, types, prod_ids, img_ids, roi_features):
-        '''
-        Calcola la loss di matching calcolando il temporal aggregator insieme. Serve fare tutto insieme perchè
-        il temporal aggregator necessita di dati in input in un'ordine particolare
-        :param match_logits: gli score di matching street2shop
-        :param types: i tipi street (0) o shop (1)
-        :param prod_ids: id dei prodotti
-        :param img_ids: id delle immagini nel batch
-        :return: loss
-        '''
+        
         img_ids = torch.tensor(img_ids)
         prod_ids = torch.tensor(prod_ids)
         street_inds = (types == 0).nonzero().view(-1)
@@ -397,15 +387,7 @@ class AggregationMatchLossDF2(object):
         self.temporal_aggregator = temporal_aggregator
 
     def __call__(self, types, roi_features, raw_gt):
-        '''
-        Calcola la loss di matching calcolando il temporal aggregator insieme. Serve fare tutto insieme perchè
-        il temporal aggregator necessita di dati in input in un'ordine particolare
-        :param match_logits: gli score di matching street2shop
-        :param types: i tipi street (0) o shop (1)
-        :param prod_ids: id dei prodotti
-        :param img_ids: id delle immagini nel batch
-        :return: loss
-        '''
+
         street_inds = (types == 0).nonzero().view(-1)
         shop_inds = (types == 1).nonzero().view(-1)
         raw_gt = torch.tensor(raw_gt)
@@ -512,19 +494,11 @@ class MatchLossPreTrained(object):
 
         gts = gts.view(-1)
 
-        # idx1 = torch.where(gts == 1)[0]
-        # idx0 = torch.where(gts == 0)[0]
-        # idx0 = torch.randperm(idx0.size(0))[:idx1.size(0)*2].to(idx1.device)
-        #
-        # keep_idxs = torch.cat([idx0, idx1], dim=0)
         logits = logits.view(-1, 2)
         loss = self.criterion(logits, gts)
 
-        # loss = self.criterion(logits[keep_idxs, :], gts[keep_idxs])
         if loss > 1.0:
-            # print("Dimezzo!")
             loss = loss / 2.0
-            # loss = - torch.mean(
-            #     gts * torch.log(logits[..., 1]) + (1 - gts) * torch.log(logits[..., 0]))
+
 
         return loss
