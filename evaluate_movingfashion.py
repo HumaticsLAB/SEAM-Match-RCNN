@@ -131,7 +131,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
 
     # calcolo performance match normale
     k_accs = [0] * len(k_thresholds)
-    k_accs_avg = [0] * len(k_thresholds)
     k_accs_avg_desc = [0] * len(k_thresholds)
     k_accs_aggr_desc = [0] * len(k_thresholds)
     k_accs_avg_dist = [0] * len(k_thresholds)
@@ -219,12 +218,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
 
 
             all_ranks_list.extend(ranks_list)
-
-            # MAX PER IMAGE
-            tmp_best_rank = int(np.min(np.asarray(ranks_list)))
-            for j, k in enumerate(k_thresholds):
-                if tmp_best_rank < k:
-                    k_accs_avg[j] += 1
             best_inds = np.asarray(best_inds)
 
             # AGGR DESC
@@ -316,10 +309,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
     for k, k_acc in zip(k_thresholds, k_accs):
         print("Top-%d Retrieval Accuracy: %1.4f" % (k, k_acc / total_querys))
     ret1 = k_accs[0] / total_querys
-    print("*" * 50)
-
-    for k, k_acc in zip(k_thresholds, k_accs_avg):
-        print("Top-%d Retrieval Accuracy Product Max: %1.4f" % (k, k_acc / count_street))
     print("*" * 50)
 
     for k, k_acc in zip(k_thresholds, k_accs_avg_desc):
@@ -415,9 +404,8 @@ def evaluate(model, data_loader, device, strategy="best_match"
     print(f"Average Track Length: {atl}")
 
     perf[0] = np.asarray(k_accs, dtype=np.float32) / total_querys
-    perf[1] = np.asarray(k_accs_avg, dtype=np.float32) / count_street
-    perf[2] = np.asarray(k_accs_avg_desc, dtype=np.float32) / count_street
-    perf[3] = np.asarray(k_accs_aggr_desc, dtype=np.float32) / count_street
+    perf[1] = np.asarray(k_accs_avg_desc, dtype=np.float32) / count_street
+    perf[2] = np.asarray(k_accs_aggr_desc, dtype=np.float32) / count_street
 
     import time
     perf = perf * 100
