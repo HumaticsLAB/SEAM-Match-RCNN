@@ -294,27 +294,7 @@ class TemporalRoIHeads(torch.nn.Module):
 
             losses.update(loss_mask)
 
-        if self.has_match:
-            if self.training:
-                types = []
-                s_imgs = []
-                i = 0
-                for p, s in zip(mask_proposals, targets):
-                    types = types + ([1] * len(p) if s['sources'][0] == 1 else [0] * len(p))
-                    s_imgs = s_imgs + ([i] * len(p))
-                    i += 1
-                types = torch.IntTensor(types)
-                final_features, match_logits = self.match_predictor(mask_roi_features, types)
-
-                gt_pairs = [t["pair_ids"] for t in targets]
-                gt_styles = [t["styles"] for t in targets]
-
-                loss_match = self.match_loss(match_logits, mask_proposals, gt_pairs, gt_styles, types, pos_matched_idxs)
-                # print(loss_match)
-                loss_match = dict(loss_match=loss_match)
-
-
-            else:
+        if self.has_match and not self.training:
                 loss_match = {}
                 s_imgs = []
                 for i, p in enumerate(mask_proposals):
@@ -332,8 +312,6 @@ class TemporalRoIHeads(torch.nn.Module):
                         r['w'] = self.match_predictor.last.weight
                         r['b'] = self.match_predictor.last.bias
                         r['roi_features'] = mask_roi_features[torch.IntTensor(s_imgs) == i]
-
-            losses.update(loss_match)
 
         return result, losses
 
