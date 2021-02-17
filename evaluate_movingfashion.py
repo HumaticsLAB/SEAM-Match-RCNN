@@ -12,7 +12,7 @@ from stuffs import transform as T
 
 
 def evaluate(model, data_loader, device, strategy="best_match"
-             , score_threshold=0.1, k_thresholds=[1, 5, 10, 20]
+             , score_threshold=0.0, k_thresholds=[1, 5, 10, 20]
              , frames_per_product=3, tracking_threshold=0.0, first_n_withvideo=None):
     count_products = 0
     count_street = 0
