@@ -106,15 +106,15 @@ python -m torch.distributed.launch --nproc_per_node=<NUM_GPUS> train_multiDF2.py
 
 
 ### Pre-Trained models
-It is possibile to use the pre-trained models instead of train the whole framework.
+It is possibile to start training using the MatchRCNN pre-trained model.
 
 **[MatchRCNN]** Pre-trained model on Deepfashion2 is available to download [here](https://bit.ly/3m3y6C4). This model can be used to start the training at the second phase (training directly SEAM Match-RCNN).
 
-**[SEAM Match-RCNN]** Pre-trained model on MovingFashion is available to download [here](http://bit.ly/...). 
+<!--**[SEAM Match-RCNN]** Pre-trained model on MovingFashion is available to download [here](http://bit.ly/...).  -->
 
-**[SEAM Match-RCNN]** Pre-trained model on MultiDeepfashion2 is available to download [here](http://bit.ly/3j8Vc9W). 
+<!-- **[SEAM Match-RCNN]** Pre-trained model on MultiDeepfashion2 is available to download [here](http://bit.ly/3j8Vc9W).-->
 
-We suggest to download the models inside the folder **ckpt**. 
+We suggest to download the model inside the folder **ckpt**. 
 
 ## Evaluation
 To evaluate the models of SEAM Match-RCNN please use the following scripts.
