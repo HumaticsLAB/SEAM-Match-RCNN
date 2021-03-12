@@ -1,7 +1,7 @@
 <!--[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-networks-for-trajectory/trajectory-prediction-on-ethucy)](https://paperswithcode.com/sota/trajectory-prediction-on-ethucy?p=transformer-networks-for-trajectory)-->
 ![PyTorch badge](https://img.shields.io/static/v1?label=pytorch&message=1.5.1&color=%3CCOLOR%3E)
 # SEAM Match-RCNN
-Official code of SEAM Match-RCNN: SElf Attention Multi-frame Match-RCNN for Street2Shop Matching using Video Sequences
+Official code of M&M’s: a low-effort multi-frame Matching and Mix System for Video-to-ShopRetrieval
 
 
 ## Installation
