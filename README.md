@@ -117,7 +117,7 @@ It is possibile to start training using the MatchRCNN pre-trained model.
 We suggest to download the model inside the folder **ckpt**. 
 
 ## Evaluation
-To evaluate the models of SEAM Match-RCNN please use the following scripts.
+To evaluate the models of M&M’s please use the following scripts.
 
 ```bash
 #evaluation on movingfashion
