@@ -30,7 +30,7 @@ class MovingFashionDataset(Dataset):
     def __len__(self):
         return len(self.product_list)
 
-    def __getitem__(self, x):
+        def __getitem__(self, x):
         if isinstance(x, int):
             i = x
             tag, index = None, None
@@ -41,7 +41,10 @@ class MovingFashionDataset(Dataset):
             else:
                 i, tag, index, video_i = x
         ret = {}
-        ret["paths"] = self.product_list[i]
+        ret["paths"] = {'video_paths': self.product_list[i]['video_paths'],
+                        'img_path': self.product_list[i]['img_path']}
+        ret['source'] = self.product_list[i]['source']
+        ret['tracklet'] = None
         ret["i"] = i
         tmp_paths = self.product_list[i]
         ret["video_i"] = -1
@@ -62,6 +65,16 @@ class MovingFashionDataset(Dataset):
             video.set(1, index2)
             success, image = video.read()
             ret['valid'] = success
+            if video_i == None:
+                if str(index2) in self.product_list[i]['tracklets'][0]:
+                    ret['tracklet'] = self.product_list[i]['tracklets'][0][str(index2)]
+            else:
+                if str(index2) in self.product_list[i]['tracklets'][video_i]:
+                    ret['tracklet'] = self.product_list[i]['tracklets'][video_i][str(index2)]
+            if ret['tracklet'] is not None:
+                ret['tracklet'] = np.asarray(ret['tracklet'])
+            else:
+                ret['tracklet'] = np.asarray([-1, -1, -1, -1])
             # assert success
             # from cv2 to PIL
             if success:
@@ -87,7 +100,7 @@ class MovingFashionDataset(Dataset):
         ret['source'] = tmp_paths["source"]
         # ret['img'] = np.asarray(img)
         ret['index'] = index
-        ret['tag'] = 1 if tag  != "video" else 0
+        ret['tag'] = 1 if tag != "video" else 0
         ret['labels'] = torch.tensor([0])
         ret['boxes'] = torch.tensor([[0.0, 0.0, img.size[0], img.size[1]]], dtype=torch.float32)
         ret['masks'] = torch.ones(1, img.size[1], img.size[0], dtype=torch.uint8)
