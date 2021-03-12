@@ -11,12 +11,13 @@ from models.video_maskrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
 
 
-def evaluate(model, data_loader, device, strategy="best_match"
-             , score_threshold=0.0, k_thresholds=[1, 5, 10, 20]
-             , frames_per_product=3, tracking_threshold=0.0, first_n_withvideo=None):
+
+def evaluate(model, data_loader, device, score_threshold=0.0, k_thresholds=[1, 5, 10, 20]
+             , frames_per_product=3, tracking_threshold=0.3, first_n_withvideo=None):
     count_products = 0
     count_street = 0
     shop_descrs = []
+    tracklets_gt = []
     street_descrs = []
     street_aggr_feats = []
     w = None
@@ -44,6 +45,7 @@ def evaluate(model, data_loader, device, strategy="best_match"
         shop_descrs.append((output[0]['match_features'][maxind].detach().cpu().numpy()
                             , count_products - 1, tmp_descr, targets[0]["source"], targets[0]["i"])
                            )
+        tracklets_gt = tracklets_gt + [t['tracklet'] for t in targets[1:]]
 
         if first_n_withvideo is not None and count_products >= first_n_withvideo:
             continue
@@ -60,8 +62,8 @@ def evaluate(model, data_loader, device, strategy="best_match"
                                           , i
                                           , int(j.detach().cpu())
                                           , float(o["scores"][j].detach().cpu())
-                                          , o["boxes"][j].detach().cpu()
-                                          ,
+                                          , o["boxes"][j].detach().cpu().numpy()
+                                          , targets[i]
                                           ))
                     tmp_roi_feats.append(o['roi_features'][j].unsqueeze(0))
         current_end = len(street_descrs)
@@ -75,9 +77,7 @@ def evaluate(model, data_loader, device, strategy="best_match"
         aggr_feats = aggr_feats.view(-1, aggr_feats.shape[-1]).detach().cpu().numpy()
         street_aggr_feats.append(aggr_feats)
 
-
     torch.cuda.empty_cache()
-    print(f"COUNT STREET: {count_street}")
 
     shop_mat = np.concatenate([x[0][np.newaxis].astype(np.float16) for x in shop_descrs])
     shop_prods = np.asarray([x[1] for x in shop_descrs])
@@ -88,8 +88,8 @@ def evaluate(model, data_loader, device, strategy="best_match"
     street_imgs = np.asarray([x[2] for x in street_descrs])
     street_scores = np.asarray([x[4] for x in street_descrs])
     street_aggr_feats = np.concatenate([x.astype(np.float16) for x in street_aggr_feats])
+    street_boxes = np.asarray([x[5] for x in street_descrs])
     shop_aggregated_descrs = np.concatenate([x[2][np.newaxis].astype(np.float16) for x in shop_descrs]).squeeze()
-
 
     def compute_ranking(inds):
         sq_diffs = (shop_mat[np.newaxis] - street_mat[inds, np.newaxis]) ** 2
@@ -115,22 +115,18 @@ def evaluate(model, data_loader, device, strategy="best_match"
     def compute_selfdist(inds):
         sq_diffs = (street_mat[np.newaxis, inds] - street_mat[inds, np.newaxis]) ** 2
         match_scores_raw = sq_diffs @ w.transpose().astype(np.float16) + b.astype(np.float16)
-        # match_scores_cls = np.exp(match_scores_raw) / np.exp(match_scores_raw).sum(2)[:, :, np.newaxis]
-        # match_scores = match_scores_cls[:, :, 1]
-        match_scores = match_scores_raw[:, :, 1]
+        match_scores_cls = np.exp(match_scores_raw) / np.exp(match_scores_raw).sum(2)[:, :, np.newaxis]
+        match_scores = match_scores_cls[:, :, 1]
+        # match_scores = match_scores_raw[:, :, 1]
         return match_scores
 
-    # calcolo i match score aggregati
     aggrW = temporal_aggregator.last.weight.detach().cpu().numpy().astype(np.float16)
     aggrB = temporal_aggregator.last.bias.detach().cpu().numpy().astype(np.float16)
 
-
-    # performance table
-    # N methods x K
     perf = np.zeros((8, len(k_thresholds)))
 
-    # calcolo performance match normale
     k_accs = [0] * len(k_thresholds)
+    k_accs_avg = [0] * len(k_thresholds)
     k_accs_avg_desc = [0] * len(k_thresholds)
     k_accs_aggr_desc = [0] * len(k_thresholds)
     k_accs_avg_dist = [0] * len(k_thresholds)
@@ -170,24 +166,52 @@ def evaluate(model, data_loader, device, strategy="best_match"
             all_street_inds = (street_prods == p_i).nonzero()[0]
             tracking_simmat = compute_selfdist(all_street_inds)
             tracking_imgs = street_imgs[street_prod_indexes]
-            best_match_ind = compute_raw_distances(all_street_inds)[:, p_i].argmax()
-            tracking_slice = tracking_simmat[best_match_ind]
-            track_inds = []
-            track_imgs = []
-            track_scores = []
-            for i, ii in enumerate(unique_imgs):
-                tmp_box_inds = (tracking_imgs == ii).nonzero()[0]
-                tmp_box_inds2 = ((street_prods == p_i) & (street_imgs == ii)).nonzero()[0]
-                tmp_score = tracking_slice[tmp_box_inds].max()
-                if tmp_box_inds.size > 0 and tmp_score > tracking_threshold:
-                    track_inds.append(tmp_box_inds2[tracking_slice[tmp_box_inds].argmax()])
-                    track_imgs.append(ii)
-                    track_scores.append(tmp_score)
-
-            track_lens.append(len(track_inds))
-            track_inds = np.asarray(track_inds)
-            track_imgs = np.asarray(track_imgs)
-
+            taken_inds = []
+            tracklets_inds = []
+            tracklets_imgs = []
+            tracklets_scores = []
+            while len(taken_inds) < all_street_inds.shape[0]:
+                tmp_all_street_inds = np.asarray([x for x in all_street_inds if x not in taken_inds])
+                start_ind = tmp_all_street_inds[street_scores[tmp_all_street_inds].argmax()]
+                start_img = street_imgs[start_ind]
+                tmp_track_inds = [start_ind]
+                tmp_track_imgs = [start_img]
+                track_scores = [street_scores[start_ind]]
+                frames_to_check = [x for x in unique_imgs if x != start_img]
+                while len(frames_to_check) > 0:
+                    idx = np.asarray([ii for ii, x in enumerate(list(tracking_imgs)) if x in frames_to_check])
+                    idx = np.asarray([x for x in idx if all_street_inds[x] not in taken_inds])
+                    if idx.shape[0] == 0:
+                        break
+                    sub_mat = tracking_simmat[
+                        np.asarray([ii for ii, x in enumerate(all_street_inds) if x in tmp_track_inds]), ...][..., idx]
+                    best_box = sub_mat.argmax()
+                    tmp_r, tmp_c = np.unravel_index(best_box, (sub_mat.shape[0], sub_mat.shape[1]))
+                    tmp_score = sub_mat[tmp_r, tmp_c]
+                    if tmp_score > tracking_threshold:
+                        tmp_track_inds.append(all_street_inds[idx[tmp_c]])
+                        tmp_track_imgs.append(tracking_imgs[idx[tmp_c]])
+                        track_scores.append(tmp_score)
+                        frames_to_check = [x for x in frames_to_check if x not in tmp_track_imgs]
+                    else:
+                        break
+                taken_inds = taken_inds + tmp_track_inds
+                tracklets_imgs.append(tmp_track_imgs)
+                tracklets_inds.append(tmp_track_inds)
+                tracklets_scores.append(track_scores)
+            ious = []
+            for tracklet_inds, tracklet_imgs in zip(tracklets_inds, tracklets_imgs):
+                box_pred = street_boxes[tracklet_inds, :]
+                box_gt = np.stack([tracklets_gt[x] for x in tracklet_imgs])
+                iou = torch.sum(
+                    torch.max(torchvision.ops.box_iou(torch.FloatTensor(box_pred), torch.FloatTensor(box_gt)), dim=-1)[
+                        0]).numpy()
+                ious.append(iou)
+            ious = np.stack(ious)
+            track_id = np.argmax(ious)
+            track_lens.append(len(tracklets_inds[track_id]))
+            track_inds = np.asarray(tracklets_inds[track_id])
+            track_imgs = np.asarray(tracklets_imgs[track_id])
 
             if source == 1:
                 count_reg += 1
@@ -216,8 +240,13 @@ def evaluate(model, data_loader, device, strategy="best_match"
                     distances.append(compute_distances(tmp_track_ind)[0])
                     scores.append(street_scores[tmp_track_ind])
 
-
             all_ranks_list.extend(ranks_list)
+
+            # MAX PER IMAGE
+            tmp_best_rank = int(np.min(np.asarray(ranks_list)))
+            for j, k in enumerate(k_thresholds):
+                if tmp_best_rank < k:
+                    k_accs_avg[j] += 1
             best_inds = np.asarray(best_inds)
 
             # AGGR DESC
@@ -234,7 +263,7 @@ def evaluate(model, data_loader, device, strategy="best_match"
             sq_diffs = (shop_aggregated_descrs[np.newaxis] - aggr_desc[np.newaxis, np.newaxis]) ** 2
             tmp_aggr_match_scores_raw = sq_diffs @ aggrW.transpose() + aggrB
             tmp_aggr_match_scores_cls = np.exp(tmp_aggr_match_scores_raw) \
-                                        / np.exp(tmp_aggr_match_scores_raw).sum(2)[:, :,np.newaxis]
+                                        / np.exp(tmp_aggr_match_scores_raw).sum(2)[:, :, np.newaxis]
             tmp_aggr_match_scores = tmp_aggr_match_scores_cls[:, :, 1]
             tmp_aggr_match_rankings = np.argsort(tmp_aggr_match_scores, 1)[:, ::-1]
             aggr_desc_rank = (tmp_aggr_match_rankings == shop_prod_index).nonzero()[1].item()
@@ -311,6 +340,10 @@ def evaluate(model, data_loader, device, strategy="best_match"
     ret1 = k_accs[0] / total_querys
     print("*" * 50)
 
+    for k, k_acc in zip(k_thresholds, k_accs_avg):
+        print("Top-%d Retrieval Accuracy Product Max: %1.4f" % (k, k_acc / count_street))
+    print("*" * 50)
+
     for k, k_acc in zip(k_thresholds, k_accs_avg_desc):
         print("Top-%d Retrieval Accuracy Product Avg Desc: %1.4f" % (k, k_acc / count_street))
     ret2 = k_accs_avg_desc[0] / count_street
@@ -332,7 +365,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
     for k, k_acc in zip(k_thresholds, k_accs_max_score):
         print("Top-%d Retrieval Accuracy Product Max Score: %1.4f" % (k, k_acc / count_street))
     print("*" * 50)
-
 
     # **************************************************************
     print("\n\n\n Regular ONLY")
@@ -390,9 +422,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
         print("Top-%d Retrieval Accuracy Product Max Score: %1.4f" % (k, k_acc / count_hard))
     print("*" * 50)
 
-
-
-
     all_ranks_list = np.asarray(all_ranks_list)
     rm = np.median(all_ranks_list)
     rmq1 = np.percentile(all_ranks_list, 25)
@@ -404,8 +433,9 @@ def evaluate(model, data_loader, device, strategy="best_match"
     print(f"Average Track Length: {atl}")
 
     perf[0] = np.asarray(k_accs, dtype=np.float32) / total_querys
-    perf[1] = np.asarray(k_accs_avg_desc, dtype=np.float32) / count_street
-    perf[2] = np.asarray(k_accs_aggr_desc, dtype=np.float32) / count_street
+    perf[1] = np.asarray(k_accs_avg, dtype=np.float32) / count_street
+    perf[2] = np.asarray(k_accs_avg_desc, dtype=np.float32) / count_street
+    perf[3] = np.asarray(k_accs_aggr_desc, dtype=np.float32) / count_street
 
     import time
     perf = perf * 100
@@ -413,7 +443,6 @@ def evaluate(model, data_loader, device, strategy="best_match"
     np.savetxt(os.path.join("logs_mf", str(time.time()) + ".csv"), perf, fmt="%02.2f", delimiter="\t")
 
     return ret1, ret2, ret3
-
 
 
 if __name__ == '__main__':
