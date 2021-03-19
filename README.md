@@ -1,7 +1,7 @@
 <!--[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-networks-for-trajectory/trajectory-prediction-on-ethucy)](https://paperswithcode.com/sota/trajectory-prediction-on-ethucy?p=transformer-networks-for-trajectory)-->
 ![PyTorch badge](https://img.shields.io/static/v1?label=pytorch&message=1.5.1&color=%3CCOLOR%3E)
-# M&M’s
-Official code of M&M’s: a low-effort multi-frame Matching and Mix System for Video-to-Shop Retrieval
+# SEAM Match-RCNN
+Official code of **Retrieval of Fashion Items from Videos-in-the-Wild: a Benchmark** paper
 
 
 ## Installation
@@ -23,8 +23,8 @@ Official code of M&M’s: a low-effort multi-frame Matching and Mix System for V
 # for that, check that `which conda`, `which pip` and `which python` points to the
 # right path. From a clean conda env, this is what you need to do
 
-conda create --name mms -y python=3
-conda activate mms
+conda create --name seam -y python=3
+conda activate seam
 
 pip install cython tqdm opencv-python
 
@@ -43,7 +43,7 @@ python setup.py build_ext install
 
 # download SEAM
 cd $INSTALL_DIR
-git clone https://github.com/VIPS4/MeMs.git
+git clone https://github.com/VIPS4/SEAM-Match-RCNN.git
 cd MeMs
 mkdir data
 mkdir ckpt
@@ -52,7 +52,7 @@ unset INSTALL_DIR
 ```
 ## Dataset
 
-M&M’s has been trained and test on MovingFashion and DeepFashion2 datasets.
+SEAM Match-RCNN has been trained and test on MovingFashion and DeepFashion2 datasets.
 Follow the instruction to download and extract the datasets.
 
 We suggest to download the datasets inside the folder **data**.
@@ -74,7 +74,7 @@ python DeepFtoCoco.py --path <dataset_root>
 
 
 ## Training
-We provide the scripts to train both Match-RCNN and M&M’s. Check the scripts for all the possible parameters.
+We provide the scripts to train both Match-RCNN and SEAM Match-RCNN. Check the scripts for all the possible parameters.
 
 ### Single GPU
 ```bash
@@ -108,7 +108,7 @@ python -m torch.distributed.launch --nproc_per_node=<NUM_GPUS> train_multiDF2.py
 ### Pre-Trained models
 It is possibile to start training using the MatchRCNN pre-trained model.
 
-**[MatchRCNN]** Pre-trained model on Deepfashion2 is available to download [here](https://bit.ly/3m3y6C4). This model can be used to start the training at the second phase (training directly M&M’s).
+**[MatchRCNN]** Pre-trained model on Deepfashion2 is available to download [here](https://bit.ly/3m3y6C4). This model can be used to start the training at the second phase (training directly SEAM Match-RCNN).
 
 <!--**[SEAM Match-RCNN]** Pre-trained model on MovingFashion is available to download [here](http://bit.ly/...).  -->
 
@@ -117,7 +117,7 @@ It is possibile to start training using the MatchRCNN pre-trained model.
 We suggest to download the model inside the folder **ckpt**. 
 
 ## Evaluation
-To evaluate the models of M&M’s please use the following scripts.
+To evaluate the models of SEAM Match-RCNN please use the following scripts.
 
 ```bash
 #evaluation on movingfashion
