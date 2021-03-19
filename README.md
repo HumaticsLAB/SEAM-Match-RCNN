@@ -44,7 +44,7 @@ python setup.py build_ext install
 # download SEAM
 cd $INSTALL_DIR
 git clone https://github.com/VIPS4/SEAM-Match-RCNN.git
-cd MeMs
+cd SEAM-Match-RCNN
 mkdir data
 mkdir ckpt
 
