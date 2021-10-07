@@ -130,6 +130,13 @@ python evaluate_multiDF2.py --root_test <path_of_dataset_root> --test_annots <js
 
 ## Citation
 ```
-BibTex
+@misc{godi2021movingfashion,
+      title={MovingFashion: a Benchmark for the Video-to-Shop Challenge}, 
+      author={Marco Godi and Christian Joppi and Geri Skenderi and Marco Cristani},
+      year={2021},
+      eprint={2110.02627},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
 ```
 
