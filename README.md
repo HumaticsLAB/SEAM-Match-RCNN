@@ -1,5 +1,6 @@
 <!--[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-networks-for-trajectory/trajectory-prediction-on-ethucy)](https://paperswithcode.com/sota/trajectory-prediction-on-ethucy?p=transformer-networks-for-trajectory)-->
-![PyTorch badge](https://img.shields.io/static/v1?label=pytorch&message=1.5.1&color=%3CCOLOR%3E)
+
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/movingfashion-a-benchmark-for-the-video-to/video-to-shop-on-movingfashion)](https://paperswithcode.com/sota/video-to-shop-on-movingfashion?p=movingfashion-a-benchmark-for-the-video-to)
 # SEAM Match-RCNN
 Official code of [**MovingFashion: a Benchmark for the Video-to-Shop Challenge**](https://arxiv.org/abs/2110.02627) paper
 
