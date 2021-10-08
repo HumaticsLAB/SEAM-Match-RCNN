@@ -60,7 +60,7 @@ We suggest to download the datasets inside the folder **data**.
 
 ### MovingFashion
 
-MovingFashion dataset will be available soon. 
+MovingFashion dataset is available for academic purposes [here](https://bit.ly/2YupgGK). 
 <!--There's no need of pre-processing steps. The dataset is ready for use. -->
 
 ### Deepfashion2
