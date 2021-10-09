@@ -1,9 +1,12 @@
 <!--[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/transformer-networks-for-trajectory/trajectory-prediction-on-ethucy)](https://paperswithcode.com/sota/trajectory-prediction-on-ethucy?p=transformer-networks-for-trajectory)-->
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/movingfashion-a-benchmark-for-the-video-to/video-to-shop-on-movingfashion)](https://paperswithcode.com/sota/video-to-shop-on-movingfashion?p=movingfashion-a-benchmark-for-the-video-to)
+
+
 # SEAM Match-RCNN
 Official code of [**MovingFashion: a Benchmark for the Video-to-Shop Challenge**](https://arxiv.org/abs/2110.02627) paper
 
+[![License: CC BY-NC 4.0](https://licensebuttons.net/l/by-nc/4.0/80x15.png)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ## Installation
 
