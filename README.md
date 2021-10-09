@@ -6,6 +6,9 @@
 # SEAM Match-RCNN
 Official code of [**MovingFashion: a Benchmark for the Video-to-Shop Challenge**](https://arxiv.org/abs/2110.02627) paper
 
+[![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
+
+
 ## Installation
 
 ### Requirements:
@@ -141,8 +144,6 @@ python evaluate_multiDF2.py --root_test <path_of_dataset_root> --test_annots <js
       primaryClass={cs.CV}
 }
 ```
-
-Shield: [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
 
 This work is licensed under a
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
