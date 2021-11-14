@@ -324,8 +324,6 @@ class VideoMatchRCNN(MaskRCNN):
 
     def load_saved_matchrcnn(self, sd):
         self.load_state_dict(sd, strict=False)
-        self.roi_heads.tracking_predictor\
-            .load_state_dict(deepcopy(self.roi_heads.match_predictor.state_dict()))
         self.roi_heads.temporal_aggregator\
             .load_state_dict(deepcopy(self.roi_heads.match_predictor.state_dict()), strict=False)
 
