@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="SEAM Training")
     parser.add_argument("--local_rank", type=int, default=0)
-    parser.add_argument("--gpus", type=str, default="2,3")
+    parser.add_argument("--gpus", type=str, default="0")
     parser.add_argument("--n_workers", type=int, default=8)
 
     parser.add_argument("--frames_per_shop_train", type=int, default=10)
