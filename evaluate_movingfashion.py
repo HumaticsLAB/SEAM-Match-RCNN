@@ -9,7 +9,7 @@ from tqdm import tqdm
 from datasets.MFDataset import MovingFashionDataset, get_dataloader
 from models.video_matchrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
-
+import torchvision
 
 
 def evaluate(model, data_loader, device, score_threshold=0.0, k_thresholds=[1, 5, 10, 20]
