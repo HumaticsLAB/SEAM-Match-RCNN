@@ -341,7 +341,7 @@ class NEWBalancedAggregationMatchLossWeak(object):
         # gts has a row for every subset of frames and a columns for every valid shop product
 
         gts = torch.zeros(seq_ids[:street_feature_inds.numel()].unique().numel()
-                          , shop_feature_inds.numel(), dtype=torch.int64).to(aggregator_logits.device)
+                          , shop_feature_inds.numel(), dtype=torch.int64)
         # for every subset of frames
         for i, seq_id in enumerate(seq_ids[:street_feature_inds.numel()].unique()):
             # inds of this sequence
@@ -356,7 +356,7 @@ class NEWBalancedAggregationMatchLossWeak(object):
 
         gts = gts.view(-1)
         logits = aggregator_logits.view(-1, 2)
-        loss = self.criterion(logits, gts)
+        loss = self.criterion(logits, gts.to(logits.device))
         return loss
 
 
