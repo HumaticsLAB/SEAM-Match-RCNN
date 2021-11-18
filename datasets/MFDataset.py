@@ -65,16 +65,17 @@ class MovingFashionDataset(Dataset):
             video.set(1, index2)
             success, image = video.read()
             ret['valid'] = success
-            if video_i == None:
-                if str(index2) in self.product_list[i]['tracklets'][0]:
-                    ret['tracklet'] = self.product_list[i]['tracklets'][0][str(index2)]
-            else:
-                if str(index2) in self.product_list[i]['tracklets'][video_i]:
-                    ret['tracklet'] = self.product_list[i]['tracklets'][video_i][str(index2)]
-            if ret['tracklet'] is not None:
-                ret['tracklet'] = np.asarray(ret['tracklet'])
-            else:
-                ret['tracklet'] = np.asarray([-1, -1, -1, -1])
+            if 'tracklets' in self.product_list[i]:
+                if video_i == None:
+                    if str(index2) in self.product_list[i]['tracklets'][0]:
+                        ret['tracklet'] = self.product_list[i]['tracklets'][0][str(index2)]
+                else:
+                    if str(index2) in self.product_list[i]['tracklets'][video_i]:
+                        ret['tracklet'] = self.product_list[i]['tracklets'][video_i][str(index2)]
+                if ret['tracklet'] is not None:
+                    ret['tracklet'] = np.asarray(ret['tracklet'])
+                else:
+                    ret['tracklet'] = np.asarray([-1, -1, -1, -1])
             # assert success
             # from cv2 to PIL
             if success:
