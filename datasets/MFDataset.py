@@ -30,7 +30,7 @@ class MovingFashionDataset(Dataset):
     def __len__(self):
         return len(self.product_list)
 
-        def __getitem__(self, x):
+    def __getitem__(self, x):
         if isinstance(x, int):
             i = x
             tag, index = None, None
