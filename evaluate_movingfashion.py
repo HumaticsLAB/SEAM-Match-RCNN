@@ -7,7 +7,7 @@ import torch.distributed as dist
 from tqdm import tqdm
 
 from datasets.MFDataset import MovingFashionDataset, get_dataloader
-from models.video_maskrcnn import videomatchrcnn_resnet50_fpn
+from models.video_matchrcnn import videomatchrcnn_resnet50_fpn
 from stuffs import transform as T
 
 
@@ -449,7 +449,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Testing")
     parser.add_argument("--local_rank", type=int, default=0)
-    parser.add_argument("--gpus", type=str, default="2,3")
+    parser.add_argument("--gpus", type=str, default="0")
     parser.add_argument("--n_workers", type=int, default=8)
 
     parser.add_argument("--frames_per_shop_test", type=int, default=10)
