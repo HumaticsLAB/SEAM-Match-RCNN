@@ -64,7 +64,7 @@ We suggest to download the datasets inside the folder **data**.
 
 ### MovingFashion
 
-MovingFashion dataset is available for academic purposes [here](https://rsrchlab-datasets.s3.eu-central-1.amazonaws.com/movingfashion.zip). 
+MovingFashion dataset is available for academic purposes [here](https://bit.ly/3OxetTl). 
 <!--There's no need of pre-processing steps. The dataset is ready for use. -->
 
 ### Deepfashion2
